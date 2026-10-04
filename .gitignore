@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Data and weights: versioned with DVC, never committed to git
+/data/raw/
+/data/processed/
+*.pth
+*.pt
+*.onnx
+
+# MLflow local tracking
+mlruns/
+mlartifacts/
+
+# Frontend
+node_modules/
+dist/
+
+# Secrets
+.env
+kaggle.json
+
+# OS
+Thumbs.db
+.DS_Store

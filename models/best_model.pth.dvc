@@ -1,0 +1,5 @@
+outs:
+- md5: 332e792fb3bd9f20540d0c6c38f43d9b
+  size: 28479976
+  hash: md5
+  path: best_model.pth
