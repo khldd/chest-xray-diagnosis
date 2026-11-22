@@ -1,0 +1,16 @@
+[project]
+name = "chest-xray-diagnosis"
+version = "0.1.0"
+description = "Multi-label diagnosis of 14 thoracic diseases from chest X-rays (NIH ChestX-ray14) with DenseNet121 and Grad-CAM"
+requires-python = ">=3.11"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
