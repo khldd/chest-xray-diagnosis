@@ -61,6 +61,29 @@ class OnnxService:
 
         self.session = ort.InferenceSession(str(onnx_path), providers=["CPUExecutionProvider"])
         self.metadata = build_metadata(onnx_path, test_metrics_path)
+        self._torch_model = None
+
+    def visualize(self, image: Image.Image, disease: str) -> np.ndarray:
+        """Grad-CAM overlay (RGB uint8, 224x224) for one disease.
+
+        Grad-CAM needs gradients, which ONNX Runtime cannot provide, so this path lazily loads
+        the PyTorch checkpoint on first use. /predict never touches torch.
+        """
+        if self._torch_model is None:
+            if not settings.MODEL_PTH.exists():
+                raise ModelUnavailable(f"PyTorch weights not found: {settings.MODEL_PTH}")
+            import torch
+
+            from src.models.densenet import build_model
+
+            model = build_model(pretrained=False)
+            model.load_state_dict(torch.load(settings.MODEL_PTH, map_location="cpu"))
+            self._torch_model = model.eval()
+        from src.data.transforms import eval_transforms
+        from src.gradcam import gradcam_overlay
+
+        tensor = eval_transforms(settings.IMG_SIZE)(image.convert("RGB"))
+        return gradcam_overlay(self._torch_model, tensor, disease)
 
     def predict(self, image: Image.Image) -> np.ndarray:
         """Return 14 sigmoid probabilities in DISEASES order."""
