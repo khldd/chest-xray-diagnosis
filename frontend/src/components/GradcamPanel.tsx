@@ -4,9 +4,17 @@ interface Props {
   overlayBase64: string | null;
   loading: boolean;
   error: string | null;
+  latencyMs: number | null;
 }
 
-export default function GradcamPanel({ originalUrl, disease, overlayBase64, loading, error }: Props) {
+export default function GradcamPanel({
+  originalUrl,
+  disease,
+  overlayBase64,
+  loading,
+  error,
+  latencyMs,
+}: Props) {
   return (
     <section className="panel">
       <h2>Grad-CAM: {disease.replace("_", " ")}</h2>
@@ -25,7 +33,9 @@ export default function GradcamPanel({ originalUrl, disease, overlayBase64, load
           )}
           {loading && <div className="placeholder muted">Computing heatmap…</div>}
           {error && !loading && <div className="placeholder error">{error}</div>}
-          <figcaption>Grad-CAM overlay</figcaption>
+          <figcaption>
+            Grad-CAM overlay{latencyMs !== null && !loading && ` · computed in ${latencyMs} ms`}
+          </figcaption>
         </figure>
       </div>
     </section>

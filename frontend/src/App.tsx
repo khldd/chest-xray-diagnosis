@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { predict, visualize, type Prediction } from "./api";
 import ExampleGallery from "./components/ExampleGallery";
 import GradcamPanel from "./components/GradcamPanel";
+import ModelInfo from "./components/ModelInfo";
 import ProbabilityBars from "./components/ProbabilityBars";
 import UploadPanel from "./components/UploadPanel";
 
@@ -16,6 +17,8 @@ export default function App() {
   const [overlay, setOverlay] = useState<string | null>(null);
   const [overlayLoading, setOverlayLoading] = useState(false);
   const [overlayError, setOverlayError] = useState<string | null>(null);
+  const [roundTripMs, setRoundTripMs] = useState<number | null>(null);
+  const [overlayMs, setOverlayMs] = useState<number | null>(null);
 
   // Monotonic counters: a response is applied only if no newer request has started since.
   const predictRun = useRef(0);
@@ -32,11 +35,15 @@ export default function App() {
     const id = ++overlayRun.current;
     setSelected(disease);
     setOverlay(null);
+    setOverlayMs(null);
     setOverlayError(null);
     setOverlayLoading(true);
     try {
       const r = await visualize(blob, disease);
-      if (id === overlayRun.current) setOverlay(r.overlay_png_base64 ?? null);
+      if (id === overlayRun.current) {
+        setOverlay(r.overlay_png_base64 ?? null);
+        setOverlayMs(r.latency_ms);
+      }
     } catch (e) {
       if (id === overlayRun.current) {
         setOverlayError(e instanceof Error ? e.message : "Heatmap failed");
@@ -54,13 +61,16 @@ export default function App() {
     setResult(null);
     setSelected(null);
     setOverlay(null);
+    setOverlayMs(null);
     setOverlayError(null);
     setOverlayLoading(false);
     setError(null);
     setLoading(true);
     try {
+      const t0 = performance.now();
       const r = await predict(blob);
       if (id !== predictRun.current) return;
+      setRoundTripMs(Math.round(performance.now() - t0));
       setResult(r);
       void loadOverlay(blob, r.top[0].disease);
     } catch (e) {
@@ -79,6 +89,7 @@ export default function App() {
         <p className="disclaimer">
           Research and educational demo. Not a diagnostic tool and not medical advice.
         </p>
+        <ModelInfo />
       </header>
 
       <ExampleGallery disabled={loading} onPick={analyze} />
@@ -101,6 +112,10 @@ export default function App() {
                 selected={selected}
                 onSelect={(d) => file && loadOverlay(file, d)}
               />
+              <p className="muted small latency">
+                Inference {result.latency_ms} ms on the server
+                {roundTripMs !== null && <> · {roundTripMs} ms round trip</>}
+              </p>
             </>
           )}
         </section>
@@ -113,6 +128,7 @@ export default function App() {
           overlayBase64={overlay}
           loading={overlayLoading}
           error={overlayError}
+          latencyMs={overlayMs}
         />
       )}
     </main>
