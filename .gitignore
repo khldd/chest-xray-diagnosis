@@ -12,6 +12,7 @@ venv/
 *.pth
 *.pt
 *.onnx
+*.onnx.data
 
 # MLflow local tracking
 mlruns/
