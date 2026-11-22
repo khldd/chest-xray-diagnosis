@@ -196,3 +196,45 @@ h2 {
     grid-template-columns: 1fr;
   }
 }
+
+.gallery {
+  margin-bottom: 16px;
+}
+
+.thumbs {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.thumb {
+  flex: 0 0 auto;
+  width: 110px;
+  padding: 4px;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.thumb:not(:disabled):hover {
+  border-color: var(--accent);
+}
+
+.thumb:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.thumb img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: 4px;
+  margin-bottom: 4px;
+}

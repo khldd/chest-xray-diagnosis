@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { predict, visualize, type Prediction } from "./api";
+import ExampleGallery from "./components/ExampleGallery";
 import GradcamPanel from "./components/GradcamPanel";
 import ProbabilityBars from "./components/ProbabilityBars";
 import UploadPanel from "./components/UploadPanel";
@@ -79,6 +80,8 @@ export default function App() {
           Research and educational demo. Not a diagnostic tool and not medical advice.
         </p>
       </header>
+
+      <ExampleGallery disabled={loading} onPick={analyze} />
 
       <div className="grid">
         <UploadPanel previewUrl={previewUrl} disabled={loading} onFile={analyze} />
