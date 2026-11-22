@@ -1,12 +1,20 @@
-"""Model metadata (and, in later commits, inference)."""
+"""Model metadata and ONNX Runtime inference."""
 from __future__ import annotations
 
 import hashlib
 import json
 from pathlib import Path
 
+import numpy as np
+from PIL import Image
+
 from api import settings
+from api.preprocess import preprocess
 from src.config import DISEASES
+
+
+class ModelUnavailable(RuntimeError):
+    """The model files needed for this operation are missing."""
 
 
 def file_sha256(path: Path) -> str:
@@ -31,3 +39,30 @@ def build_metadata(onnx_path: Path, test_metrics_path: Path) -> dict:
         "test_mean_auc": test_auc,
         "onnx_sha256": file_sha256(onnx_path) if onnx_path.exists() else None,
     }
+
+
+class OnnxService:
+    """Fast-path inference with ONNX Runtime (CPU).
+
+    Any object with the same `classes`, `metadata`, `predict` interface can stand in for it,
+    which is how the API tests avoid needing the real weights.
+    """
+
+    classes = DISEASES
+
+    def __init__(
+        self,
+        onnx_path: Path = settings.MODEL_ONNX,
+        test_metrics_path: Path = settings.TEST_METRICS,
+    ):
+        if not onnx_path.exists():
+            raise ModelUnavailable(f"ONNX model not found: {onnx_path}")
+        import onnxruntime as ort
+
+        self.session = ort.InferenceSession(str(onnx_path), providers=["CPUExecutionProvider"])
+        self.metadata = build_metadata(onnx_path, test_metrics_path)
+
+    def predict(self, image: Image.Image) -> np.ndarray:
+        """Return 14 sigmoid probabilities in DISEASES order."""
+        logits = self.session.run(None, {"image": preprocess(image, settings.IMG_SIZE)})[0][0]
+        return 1.0 / (1.0 + np.exp(-logits.astype(np.float64)))
