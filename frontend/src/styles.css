@@ -145,3 +145,54 @@ h2 {
   color: var(--muted);
   font-size: 0.85rem;
 }
+
+.small {
+  font-size: 0.85rem;
+  margin: 0 0 12px;
+}
+
+.panel + .panel,
+.grid + .panel {
+  margin-top: 16px;
+}
+
+.compare {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.compare figure {
+  margin: 0;
+  text-align: center;
+}
+
+.compare img {
+  width: 100%;
+  max-width: 448px;
+  border-radius: 6px;
+}
+
+.compare figcaption {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1 / 1;
+  max-width: 448px;
+  margin: 0 auto;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  padding: 12px;
+}
+
+@media (max-width: 800px) {
+  .compare {
+    grid-template-columns: 1fr;
+  }
+}
