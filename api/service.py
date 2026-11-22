@@ -52,9 +52,11 @@ class OnnxService:
 
     def __init__(
         self,
-        onnx_path: Path = settings.MODEL_ONNX,
-        test_metrics_path: Path = settings.TEST_METRICS,
+        onnx_path: Path | None = None,
+        test_metrics_path: Path | None = None,
     ):
+        onnx_path = onnx_path or settings.MODEL_ONNX
+        test_metrics_path = test_metrics_path or settings.TEST_METRICS
         if not onnx_path.exists():
             raise ModelUnavailable(f"ONNX model not found: {onnx_path}")
         import onnxruntime as ort
