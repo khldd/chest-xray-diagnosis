@@ -6,9 +6,11 @@ import io
 import time
 
 from fastapi import FastAPI, HTTPException, Request, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from PIL import Image
 
 from api import settings
+from api.images import read_image
 from api.service import ModelUnavailable, OnnxService, build_metadata
 
 
@@ -18,6 +20,12 @@ def create_app(service=None) -> FastAPI:
         title="Chest X-ray Diagnosis API",
         description="Research/educational demo. Not a diagnostic tool.",
         version="0.1.0",
+    )
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.CORS_ORIGINS,
+        allow_methods=["GET", "POST"],
+        allow_headers=["*"],
     )
     app.state.service = service
 
@@ -49,7 +57,7 @@ def create_app(service=None) -> FastAPI:
     @app.post("/predict")
     def predict(request: Request, file: UploadFile) -> dict:
         svc = get_service(request)
-        image = Image.open(file.file)
+        image = read_image(file)
         start = time.perf_counter()
         probs = svc.predict(image)
         return _prediction_payload(svc, probs, start)
@@ -59,7 +67,7 @@ def create_app(service=None) -> FastAPI:
         svc = get_service(request)
         if disease not in svc.classes:
             raise HTTPException(status_code=400, detail=f"Unknown disease: {disease}")
-        image = Image.open(file.file)
+        image = read_image(file)
         start = time.perf_counter()
         probs = svc.predict(image)
         try:
