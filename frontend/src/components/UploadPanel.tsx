@@ -1,9 +1,10 @@
 import { useRef, useState } from "react";
+import WebcamCapture from "./WebcamCapture";
 
 interface Props {
   previewUrl: string | null;
   disabled: boolean;
-  onFile: (file: File) => void;
+  onFile: (file: Blob) => void;
 }
 
 export default function UploadPanel({ previewUrl, disabled, onFile }: Props) {
@@ -51,6 +52,7 @@ export default function UploadPanel({ previewUrl, disabled, onFile }: Props) {
           e.target.value = ""; // allow re-selecting the same file
         }}
       />
+      <WebcamCapture disabled={disabled} onCapture={onFile} />
     </section>
   );
 }
