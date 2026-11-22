@@ -1,0 +1,21 @@
+# Default training configuration. Override with: python -m src.train --config configs/<file>.yaml
+data:
+  root: /kaggle/input/datasets/nih-chest-xrays/data
+  val_fraction: 0.15
+  seed: 42
+  img_size: 224
+  batch_size: 32
+  num_workers: 2
+  augmentation: flip        # none | flip | strong
+
+model:
+  name: densenet121
+  pretrained: true
+  freeze_backbone: false
+
+train:
+  epochs: 15
+  lr: 0.0001
+  loss: weighted_bce        # weighted_bce | bce
+  output_dir: /kaggle/working
+  mlflow_experiment: chest-xray
