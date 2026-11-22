@@ -56,10 +56,10 @@ def main() -> None:
     device = "cuda" if torch.cuda.is_available() else "cpu"
     splits = make_splits(cfg["data"]["root"], cfg["data"]["val_fraction"], cfg["data"]["seed"])
     df, labels = splits[args.split]
-    ds = ChestXrayDataset(
-        df, labels, build_image_lookup(cfg["data"]["root"]), eval_transforms(cfg["data"]["img_size"])
-    )
-    loader = DataLoader(ds, batch_size=cfg["data"]["batch_size"], num_workers=cfg["data"]["num_workers"])
+    d = cfg["data"]
+    lookup = build_image_lookup(d["root"])
+    ds = ChestXrayDataset(df, labels, lookup, eval_transforms(d["img_size"]))
+    loader = DataLoader(ds, batch_size=d["batch_size"], num_workers=d["num_workers"])
 
     model = build_model(pretrained=False).to(device)
     model.load_state_dict(torch.load(args.weights, map_location=device))
