@@ -35,11 +35,25 @@ python -m kaggle models instances versions download haydermethneni/best-model/py
 
 ## Roadmap
 
+## Pipeline usage
+
+```bash
+pip install -r requirements/dev.txt
+python -m src.train --config configs/base.yaml            # train (MLflow-tracked, resumable)
+python -m src.evaluate --weights models/best_model.pth --split test --out results/test_metrics.json
+python -m src.export_onnx --weights models/best_model.pth  # writes models/best_model.onnx + parity check
+pytest && ruff check .
+```
+
+Experiments override `configs/base.yaml` (loss, augmentation, `freeze_backbone`, epochs); see `CONTRIBUTING.md` for the branch and commit workflow.
+
+## Roadmap
+
 Following the course milestones:
 
 - [x] Topic and dataset chosen, repo initialized, DVC set up
 - [ ] DVC remote
-- [ ] `src/` pipeline (dataset, architecture, training with MLflow, evaluation + ONNX export, Grad-CAM)
+- [x] `src/` pipeline (dataset, architecture, training with MLflow, evaluation + ONNX export, Grad-CAM)
 - [ ] Test-set evaluation, baseline comparison, augmentation and loss ablations
 - [ ] FastAPI backend (`/health`, `/model/metadata`, `/predict`, `/predict/visualize`) with ONNX Runtime
 - [ ] React frontend (upload, example gallery, webcam, probability bars, Grad-CAM overlay, latency)
