@@ -1,0 +1,21 @@
+\IfFileExists{tables/ablations.tex}{%
+  To measure what each design choice contributes, we compare variants of the main setup under an identical budget (same data split, optimiser and number of epochs). Table~\ref{tab:ablations} and Figure~\ref{fig:ablation_curves} report the validation mean AUC; the test set is not used for these comparisons.
+
+  \begin{table}[ht]
+  \centering
+  \input{tables/ablations.tex}
+  \caption{Ablation runs. ``Best epoch'' is the epoch with the highest validation mean AUC.}
+  \label{tab:ablations}
+  \end{table}
+
+  \begin{figure}[ht]
+  \centering
+  \IfFileExists{figures/ablation_curves.png}{\includegraphics[width=0.75\textwidth]{ablation_curves.png}}{}
+  \caption{Validation mean AUC per epoch for each ablation run.}
+  \label{fig:ablation_curves}
+  \end{figure}
+
+  \input{sections/ablations_analysis.tex}
+}{%
+  The planned ablation study (frozen backbone versus fine-tuning, weighted versus plain binary cross-entropy, and the effect of data augmentation) was configured and is reproducible from the repository, but its results were not available when this report was written, so we draw no conclusions about these design choices here.
+}
