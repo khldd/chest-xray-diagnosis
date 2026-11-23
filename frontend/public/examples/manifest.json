@@ -1,1 +1,34 @@
-[]
+[
+  {
+    "file": "00000211_004.png",
+    "label": "Cardiomegaly"
+  },
+  {
+    "file": "00001558_005.png",
+    "label": "Effusion"
+  },
+  {
+    "file": "00000013_034.png",
+    "label": "Emphysema"
+  },
+  {
+    "file": "00001248_022.png",
+    "label": "Pneumothorax"
+  },
+  {
+    "file": "00001152_003.png",
+    "label": "Edema"
+  },
+  {
+    "file": "00001900_020.png",
+    "label": "Mass"
+  },
+  {
+    "file": "00001373_053.png",
+    "label": "Infiltration"
+  },
+  {
+    "file": "00000583_033.png",
+    "label": "Atelectasis"
+  }
+]
