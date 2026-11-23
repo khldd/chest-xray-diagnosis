@@ -1,0 +1,82 @@
+"""End-to-end smoke test of src.train on a tiny synthetic NIH-style dataset (CPU, seconds)."""
+import json
+import sys
+
+import numpy as np
+import pytest
+
+torch = pytest.importorskip("torch")
+pytest.importorskip("torchvision")
+pytest.importorskip("mlflow")
+
+from PIL import Image  # noqa: E402
+
+from src import train  # noqa: E402
+from src.config import DISEASES  # noqa: E402
+
+
+def make_fake_nih(root, n_images=48):
+    """Create Data_Entry_2017.csv, train_val_list.txt and images_001/images/*.png."""
+    img_dir = root / "images_001" / "images"
+    img_dir.mkdir(parents=True)
+    rng = np.random.default_rng(0)
+    rows, names = [], []
+    for i in range(n_images):
+        name = f"{i // 2:08d}_{i % 2:03d}.png"  # 2 images per patient
+        names.append(name)
+        labels = "No Finding" if i % 7 == 0 else "|".join(
+            {DISEASES[i % 14], DISEASES[(i * 3) % 14]}
+        )
+        rows.append(f"{name},{labels},{i // 2}")
+        arr = (rng.random((40, 40)) * 255).astype("uint8")
+        Image.fromarray(arr).save(img_dir / name)
+    (root / "Data_Entry_2017.csv").write_text(
+        "Image Index,Finding Labels,Patient ID\n" + "\n".join(rows) + "\n", encoding="utf-8"
+    )
+    (root / "train_val_list.txt").write_text("\n".join(names), encoding="utf-8")
+
+
+def run_train(monkeypatch, tmp_path, epochs):
+    cfg = tmp_path / "smoke.yaml"
+    cfg.write_text(
+        "data:\n  img_size: 64\n  batch_size: 8\n  num_workers: 0\n"
+        "model:\n  pretrained: false\n"
+        f"train:\n  epochs: {epochs}\n  loss: bce\n  output_dir: {(tmp_path / 'out').as_posix()}\n",
+        encoding="utf-8",
+    )
+    argv = ["train", "--config", str(cfg), "--data-root", str(tmp_path / "nih")]
+    monkeypatch.setattr(sys, "argv", [*argv, "--run-name", "smoke"])
+    train.main()
+    return json.loads((tmp_path / "out" / "metrics.json").read_text(encoding="utf-8"))
+
+
+def test_train_writes_metrics_and_resumes(monkeypatch, tmp_path):
+    make_fake_nih(tmp_path / "nih")
+    monkeypatch.chdir(tmp_path)  # keeps the mlruns/ folder inside tmp
+
+    first = run_train(monkeypatch, tmp_path, epochs=2)
+    assert [h["epoch"] for h in first["history"]] == [1, 2]
+    assert first["best_epoch"] in (1, 2)
+    assert (tmp_path / "out" / "best_model.pth").exists()
+    assert first["run"] == "smoke"
+
+    # Resuming with a higher epoch count must continue from epoch 3, not restart.
+    second = run_train(monkeypatch, tmp_path, epochs=3)
+    assert [h["epoch"] for h in second["history"]] == [1, 2, 3]
+
+
+def test_weighted_criterion_handles_empty_class():
+    labels = np.zeros((10, 14), dtype=np.float32)
+    labels[:5, 0] = 1  # classes 1..13 have no positives
+    criterion = train.make_criterion("weighted_bce", labels, "cpu")
+    assert torch.isfinite(criterion.pos_weight).all()
+
+
+def test_write_metrics_picks_best_epoch(tmp_path):
+    history = [
+        {"epoch": 1, "val_mean_auc": 0.7},
+        {"epoch": 2, "val_mean_auc": 0.8},
+        {"epoch": 3, "val_mean_auc": 0.75},
+    ]
+    out = train.write_metrics(str(tmp_path / "m.json"), "r", {}, history, 0.8, {"Mass": 0.8})
+    assert out["best_epoch"] == 2
