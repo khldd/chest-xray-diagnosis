@@ -1,0 +1,7 @@
+# Ablation run (plain BCE, no pos_weight). Same as base.yaml except the lines below.
+# Run: python -m src.train --config configs/unweighted_bce.yaml --run-name unweighted_bce
+train:
+  epochs: 5
+  loss: bce
+  output_dir: /kaggle/working/unweighted_bce
+  mlflow_experiment: chest-xray-ablations

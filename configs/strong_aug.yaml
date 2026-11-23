@@ -1,0 +1,8 @@
+# Ablation run (strong augmentation: rotation, resized crop, color jitter). Same as base.yaml except the lines below.
+# Run: python -m src.train --config configs/strong_aug.yaml --run-name strong_aug
+data:
+  augmentation: strong
+train:
+  epochs: 5
+  output_dir: /kaggle/working/strong_aug
+  mlflow_experiment: chest-xray-ablations
