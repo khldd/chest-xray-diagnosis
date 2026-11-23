@@ -1,0 +1,140 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage[margin=2.4cm]{geometry}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{caption}
+\usepackage{microtype}
+\usepackage{xcolor}
+\usepackage[colorlinks=true,linkcolor=blue!50!black,urlcolor=blue!50!black,citecolor=blue!50!black]{hyperref}
+
+\graphicspath{{figures/}}
+\captionsetup{font=small,labelfont=bf}
+\setlength{\parskip}{0.5em}
+\setlength{\parindent}{0pt}
+
+\title{Multi-label Diagnosis of 14 Thoracic Diseases from Chest X-rays\\
+\large DenseNet121 transfer learning with Grad-CAM explanations and a deployed demo}
+\author{Hayder Methneni \and Khaled Ayedi}
+\date{Deep Learning Avanc\'e --- TEK-UP, ING-5, 2026--2027\\ (also submitted for Big Data)}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We train a DenseNet121 initialised from ImageNet to detect 14 thoracic diseases, each independently, from frontal chest X-rays of the NIH ChestX-ray14 dataset. A weighted binary cross-entropy loss compensates for severe class imbalance, and validation is done on a patient-wise split to avoid leakage. The model reaches a mean AUC of 0.831 on validation and \textbf{0.799 on the official test set} of 25{,}596 images. Grad-CAM heatmaps show which image regions drive each prediction. The model is exported to ONNX and served through a FastAPI backend with a React frontend, packaged with Docker Compose and checked by continuous integration. This is a research and educational demo, not a diagnostic tool.
+\end{abstract}
+
+\section{Introduction}
+Chest radiography is one of the most common imaging exams, and reading it is slow and subject to variability between readers. Automatic multi-label classification of findings is a standard benchmark for medical image analysis with deep learning. The task is difficult for three reasons: findings are visually subtle, several can co-occur in one image, and the labels are noisy.
+
+Our goals were to (i) build a sound, reproducible training and evaluation pipeline, (ii) report honest numbers on the official test split, (iii) make the predictions inspectable with Grad-CAM, and (iv) deliver the model as a working application rather than a notebook. The full code, tests and instructions are in the project repository (\url{https://github.com/khldd/chest-xray-diagnosis}).
+
+\section{Dataset}
+We use the NIH ChestX-ray14 dataset~\cite{wang2017chestxray}: 112{,}120 frontal X-rays from 30{,}805 patients, each labelled with any of 14 findings (or ``No Finding''). The labels were extracted automatically from radiology reports, so they contain noise that no model can overcome. The images (about 45 GB) are not stored in the repository.
+
+\paragraph{Splits.} We keep the official split: \texttt{train\_val\_list} (86{,}524 images) and \texttt{test\_list} (25{,}596 images), the latter used only for the final evaluation. From the training pool we hold out 15\% as validation using \texttt{GroupShuffleSplit} grouped by patient identifier (seed 42), so that no patient appears in both training and validation. This gives 73{,}916 training, 12{,}608 validation and 25{,}596 test images. A unit test checks that the patient sets are disjoint.
+
+\paragraph{Labels and imbalance.} Each image gets a 14-dimensional multi-hot vector; ``No Finding'' is the all-zero vector. The classes are strongly imbalanced (Table~\ref{tab:classes}): Infiltration is present in 16.0\% of training images, while Hernia is present in only 0.15\% (113 images).
+
+\begin{table}[ht]
+\centering
+\input{tables/classes.tex}
+\caption{Per-class training prevalence, loss weight and test AUC. The loss weight is the ratio of negatives to positives in the training split.}
+\label{tab:classes}
+\end{table}
+
+\section{Method}
+\paragraph{Preprocessing.} Images are resized to $224\times224$, replicated to three channels, and normalised with ImageNet statistics. The only training augmentation in the main model is a random horizontal flip; evaluation uses no augmentation.
+
+\paragraph{Model.} We use DenseNet121~\cite{huang2017densenet} pretrained on ImageNet and replace the 1000-way classifier with a linear layer from 1024 features to 14 outputs. All 6.97 million parameters are fine-tuned. Each output is passed through a sigmoid at inference time, giving an independent probability per disease.
+
+\paragraph{Loss.} Training uses binary cross-entropy with logits and a per-class positive weight $w_c = N^{-}_c / N^{+}_c$ computed on the training split (Table~\ref{tab:classes}), which ranges from 5.2 for Infiltration to 653 for Hernia. Without it, a model can reach a low loss by predicting ``absent'' for rare findings.
+
+\paragraph{Optimisation.} Adam with learning rate $10^{-4}$, batch size 32, up to 15 epochs on a Kaggle T4 GPU. After every epoch the mean validation AUC is computed and the checkpoint with the best value is kept. The final pipeline writes the full training state (weights, optimiser, epoch, history) so a run can be resumed, and logs to MLflow.
+
+\paragraph{Metric.} Because the data are imbalanced and multi-label, we report the area under the ROC curve (AUC) per class and its mean over the 14 classes. Accuracy would be misleading here.
+
+\paragraph{Explanations.} Grad-CAM~\cite{selvaraju2017gradcam} is computed on the last feature layer (\texttt{features.norm5}) for a chosen disease. It produces a coarse heatmap of the regions that increased that disease's score.
+
+\section{Results}
+\subsection{Main model}
+The selected checkpoint reaches a mean AUC of \textbf{0.831} on the validation split and \textbf{0.7987} on the official test split. Table~\ref{tab:classes} lists the per-class test AUCs and Figure~\ref{fig:auc} plots them. Hernia (0.933), Emphysema (0.909) and Cardiomegaly (0.871) are the best-detected findings; Pneumonia (0.688) and Infiltration (0.693) are the weakest.
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.82\textwidth]{test_auc_per_class.png}
+\caption{Per-class AUC of the final model on the official test set (25{,}596 images).}
+\label{fig:auc}
+\end{figure}
+
+The gap between validation and test is expected and we do not hide it. The best epoch was selected on the validation set, which makes that number slightly optimistic, and the test patients are different. The weakest classes include findings that are typically diffuse or ambiguous on a frontal film (Infiltration, Pneumonia, Consolidation). Hernia has the highest AUC despite having only 113 training positives; because it is the rarest class, its estimate is likely the least stable, and we did not compute confidence intervals.
+
+\subsection{Ablations}
+\label{sec:ablations}
+\input{sections/ablations.tex}
+
+\subsection{Qualitative analysis with Grad-CAM}
+Figure~\ref{fig:gradcam} shows heatmaps for two correctly detected test images. For Cardiomegaly the activation is concentrated on the cardiac silhouette; for Effusion it covers the lower lung zone, where fluid collects. This agrees with where a radiologist would look.
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.9\textwidth]{gradcam_Cardiomegaly.png}\\[0.5em]
+\includegraphics[width=0.9\textwidth]{gradcam_Effusion.png}
+\caption{Original X-ray (left) and Grad-CAM overlay for the labelled disease (right), with the model probability. Both images belong to the official test split.}
+\label{fig:gradcam}
+\end{figure}
+
+These examples are \emph{confident} cases chosen for demonstration (probabilities close to 1), not typical ones. Grad-CAM is a qualitative tool: we did not measure localisation accuracy against annotated regions, so the heatmaps should be read as plausibility checks and not as evidence of correct reasoning.
+
+\section{System}
+The model is delivered as a small web application (Figure~\ref{fig:arch}).
+
+\begin{figure}[ht]
+\centering
+\small
+\begin{tabular}{@{}c@{\ \ }c@{\ \ }c@{\ \ }c@{\ \ }c@{}}
+Browser (React) & $\rightarrow$ & nginx & $\rightarrow$ & FastAPI (ONNX Runtime; PyTorch for Grad-CAM)
+\end{tabular}
+\caption{Architecture. nginx serves the single-page app and proxies \texttt{/api} to the backend, so the browser makes no cross-origin calls.}
+\label{fig:arch}
+\end{figure}
+
+\paragraph{Backend.} The trained PyTorch model is exported to ONNX. An automatic check confirms the exported model matches PyTorch (largest output difference about $1.4\times10^{-6}$), and the API's probabilities match PyTorch to about $1.5\times10^{-7}$. Preprocessing in the API is implemented in NumPy and tested to be identical to the training-time transforms. The endpoints are:
+\begin{itemize}
+  \item \texttt{GET /health} and \texttt{GET /model/metadata} (classes, input size, validation and test AUC, model hash);
+  \item \texttt{POST /predict}: all 14 probabilities, the top five, and latency;
+  \item \texttt{POST /predict/visualize}: the same plus a Grad-CAM overlay. Grad-CAM needs gradients, which ONNX Runtime does not provide, so this endpoint loads the PyTorch checkpoint lazily.
+\end{itemize}
+Uploads are decoded for real, not trusted by file type: non-images are rejected with a 400 and files over 10~MB with a 413. Cross-origin access is limited to configured origins.
+
+\paragraph{Frontend.} A React and TypeScript single-page app supports drag-and-drop upload, an example gallery of eight test-set X-rays, webcam capture (implemented, but not yet tested with a physical camera), probability bars, a Grad-CAM overlay selectable per disease, and a display of model metadata and latency. Stale responses are discarded so a slow heatmap cannot overwrite a newer upload.
+
+\paragraph{Performance.} On a laptop CPU, \texttt{/predict} takes about 25~ms per image. A Grad-CAM heatmap takes about 0.3~s once warm, but the first one after the server starts takes 7 to 13~s because PyTorch and the model are loaded; the interface shows a loading state for this.
+
+\paragraph{Engineering.} Model weights are versioned with DVC and stored on a DagsHub remote; git holds only a small pointer file. Training is configured by YAML files and tracked with MLflow. Automated tests (data splitting, model shapes, ONNX parity, the API with a stub model, and an end-to-end training smoke test on synthetic data) run in GitHub Actions together with linting, the frontend build and the Docker image build. The application is started with \texttt{docker compose up}; weights are mounted into the container and never baked into an image.
+
+\section{Limitations and ethics}
+\begin{itemize}
+  \item \textbf{Not a medical device.} The system is a research and educational demo. It must not be used for diagnosis, and the interface says so.
+  \item \textbf{Label noise.} Labels are machine-extracted from reports, so reported AUCs measure agreement with noisy labels, not with a radiologist's ground truth.
+  \item \textbf{Single dataset, single hospital.} We did no external validation, so performance on other populations and scanners is unknown.
+  \item \textbf{Single run, no confidence intervals.} Results come from one training run and one seed; differences of a few thousandths of AUC are not meaningful.
+  \item \textbf{Low resolution.} Images are reduced to $224\times224$, which can hide small findings such as nodules.
+  \item \textbf{No calibration study.} The sigmoid outputs rank cases well (AUC) but are not calibrated probabilities.
+  \item \textbf{Horizontal flip.} Flipping moves the heart to the wrong side of the image, which may matter for findings such as Cardiomegaly.
+\end{itemize}
+
+\section{Conclusion}
+We built an end-to-end system: a leakage-free training pipeline, a DenseNet121 classifier with a mean test AUC of 0.799, visual explanations, and a tested, containerised application. Natural next steps are higher input resolution, a stronger backbone, label-noise-aware training, calibration, quantitative evaluation of the heatmaps, and external validation.
+
+\begin{thebibliography}{9}
+\bibitem{wang2017chestxray} X.~Wang, Y.~Peng, L.~Lu, Z.~Lu, M.~Bagheri, R.~Summers. ChestX-ray8: Hospital-scale chest X-ray database and benchmarks on weakly-supervised classification and localization of common thorax diseases. \emph{CVPR}, 2017.
+\bibitem{huang2017densenet} G.~Huang, Z.~Liu, L.~van~der~Maaten, K.~Weinberger. Densely connected convolutional networks. \emph{CVPR}, 2017.
+\bibitem{selvaraju2017gradcam} R.~Selvaraju, M.~Cogswell, A.~Das, R.~Vedantam, D.~Parikh, D.~Batra. Grad-CAM: Visual explanations from deep networks via gradient-based localization. \emph{ICCV}, 2017.
+\end{thebibliography}
+
+\end{document}
