@@ -1,0 +1,21 @@
+# Run:  docker compose up --build      then open http://localhost:8080
+# Needs models/best_model.onnx, models/best_model.onnx.data and models/best_model.pth
+# (fetch them first, see README "Model weights").
+services:
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    volumes:
+      - ./models:/models:ro
+    ports:
+      - "8000:8000" # optional: direct access and the /docs page
+    restart: unless-stopped
+
+  web:
+    build: ./frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - api
+    restart: unless-stopped
