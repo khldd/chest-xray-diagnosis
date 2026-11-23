@@ -1,0 +1,5 @@
+[core]
+    remote = origin
+['remote "origin"']
+    url = https://dagshub.com/khldd/chest-xray-diagnosis.dvc
+    auth = basic

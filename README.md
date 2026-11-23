@@ -29,7 +29,18 @@ Prototype: [`notebooks/chest-xray-diagnosis.ipynb`](notebooks/chest-xray-diagnos
 
 ## Model weights
 
-Weights are versioned with [DVC](https://dvc.org/): git only holds `models/best_model.pth.dvc`. No DVC remote is configured yet, so download the weights from Kaggle (needs access to the model and the [Kaggle CLI](https://github.com/Kaggle/kaggle-api)):
+Weights are versioned with [DVC](https://dvc.org/): git only holds `models/best_model.pth.dvc`. The DVC remote is on DagsHub (`https://dagshub.com/khldd/chest-xray-diagnosis.dvc`), so after cloning:
+
+```bash
+pip install dvc
+dvc remote modify --local origin user <your-dagshub-username>
+dvc remote modify --local origin password <your-dagshub-token>   # stored in the git-ignored .dvc/config.local
+dvc pull
+```
+
+A teammate needs to be added as a collaborator on the DagsHub repo first, and uses their own DagsHub token (DagsHub, then Settings, then Tokens). Never commit the token.
+
+Without DagsHub access, download the weights from Kaggle instead (needs access to the model and the [Kaggle CLI](https://github.com/Kaggle/kaggle-api)):
 
 ```bash
 python -m kaggle models instances versions download haydermethneni/best-model/pytorch/default/1 -p models --untar
@@ -100,7 +111,7 @@ Uploads are decoded for real: non-images get a 400 and files over 10 MB a 413.
 Following the course milestones:
 
 - [x] Topic and dataset chosen, repo initialized, DVC set up
-- [ ] DVC remote
+- [x] DVC remote (DagsHub)
 - [x] `src/` pipeline (dataset, architecture, training with MLflow, evaluation + ONNX export, Grad-CAM)
 - [x] Test-set evaluation
 - [ ] Baseline comparison, augmentation and loss ablations (configs ready, runs pending)
