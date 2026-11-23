@@ -1,0 +1,6 @@
+# Ablation run (reference: full fine-tuning, weighted BCE, flip, 5 epochs). Same as base.yaml except the lines below.
+# Run: python -m src.train --config configs/base_5ep.yaml --run-name base_5ep
+train:
+  epochs: 5
+  output_dir: /kaggle/working/base_5ep
+  mlflow_experiment: chest-xray-ablations

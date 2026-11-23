@@ -1,0 +1,8 @@
+# Ablation run (frozen backbone: only the new 14-way head is trained). Same as base.yaml except the lines below.
+# Run: python -m src.train --config configs/baseline_frozen.yaml --run-name baseline_frozen
+model:
+  freeze_backbone: true
+train:
+  epochs: 5
+  output_dir: /kaggle/working/baseline_frozen
+  mlflow_experiment: chest-xray-ablations
