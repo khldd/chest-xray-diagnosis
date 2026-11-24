@@ -1,0 +1,96 @@
+\documentclass[11pt,a4paper,landscape]{article}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage[margin=1.3cm,top=1.2cm,bottom=1.2cm]{geometry}
+\usepackage{graphicx,booktabs,xcolor}
+\usepackage[colorlinks=true,linkcolor=blue!50!black]{hyperref}
+\graphicspath{{figures/}}
+\pagestyle{empty}
+\setlength{\parindent}{0pt}\setlength{\parskip}{0.3em}
+
+% one visual per page: \slide{title}{one-line takeaway}{file}{max height}
+\newcommand{\slide}[4]{%
+  \newpage
+  {\Large\bfseries #1}\par
+  {\small\color{black!65} #2}\par\vspace{0.3em}
+  \begin{center}\includegraphics[height=#4,width=\textwidth,keepaspectratio]{#3}\end{center}}
+\newcommand{\slideif}[4]{\IfFileExists{figures/#3}{\slide{#1}{#2}{#3}{#4}}{}}
+
+\begin{document}
+\thispagestyle{empty}
+{\Huge\bfseries Chest X-ray Diagnosis}\par\vspace{0.4em}
+{\large DenseNet121, 14 thoracic diseases, NIH ChestX-ray14 \quad|\quad Hayder Methneni, Khaled Ayedi}\par\vspace{1.2em}
+
+{\large\bfseries Visuals (in presenting order)}\par\vspace{0.3em}
+\begin{minipage}[t]{0.48\textwidth}
+\begin{enumerate}\setlength{\itemsep}{1pt}
+  \item System and pipeline
+  \item Data split (by patient)
+  \item Class imbalance
+  \item Test AUC per class
+  \item ROC curves
+  \item Precision-recall curves
+  \item Confusion matrices
+  \item Metrics table
+  \item Calibration
+\end{enumerate}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.48\textwidth}
+\begin{enumerate}\setlength{\itemsep}{1pt}\setcounter{enumi}{9}
+  \item Ablation study
+  \item Training prevalence and loss weights
+  \item Grad-CAM examples
+  \item The web app
+\end{enumerate}
+\vspace{0.8em}
+\small Headline result: \textbf{0.799 mean AUC} on the official test set (25,596 images); validation 0.831.\par
+Research demo, not a diagnostic tool.
+\end{minipage}
+
+\slide{1. System and pipeline}{Train on Kaggle, export to ONNX, serve behind nginx + FastAPI; Grad-CAM uses PyTorch.}{architecture.png}{15cm}
+\slide{2. Data split}{Split by patient: no patient is in both train and validation. Test set is the official one, used once.}{split_diagram.png}{14cm}
+\slide{3. Class imbalance}{Infiltration is 16\% of images, Hernia 0.15\%. Rare classes get a larger loss weight.}{class_imbalance.png}{15cm}
+\slide{4. Test AUC per class}{Mean 0.7987. Best: Hernia, Emphysema, Cardiomegaly. Weakest: Pneumonia, Infiltration.}{test_auc_per_class.png}{15cm}
+\slideif{5. ROC curves}{Per-class ROC on the test set; the dashed line is chance.}{roc_curves.png}{15.5cm}
+\slideif{6. Precision-recall curves}{Rare diseases (Pneumonia, Fibrosis) have low precision; mean AP 0.27 vs AUC 0.80.}{pr_curves.png}{15.5cm}
+\slideif{7. Confusion matrices}{Per class, test set. Cutoffs were chosen on validation only (Youden J).}{confusion_matrices.png}{16cm}
+
+\IfFileExists{tables/metrics.tex}{%
+\newpage
+{\Large\bfseries 8. Metrics table}\par
+{\small\color{black!65} At the validation-chosen cutoff: mean sensitivity 0.82, specificity 0.62, precision (PPV) 0.14. AUC and AP are threshold-free.}\par\vspace{1em}
+\begin{center}\small\input{tables/metrics.tex}\end{center}}{}
+
+\slideif{9. Calibration}{Over-confident: mean predicted 0.38 vs 0.076 actual positives (weighted loss inflates scores). Ranking, so AUC, is unaffected.}{calibration.png}{12.5cm}
+
+\newpage
+{\Large\bfseries 10. Ablation study}\par
+{\small\color{black!65} Same data, split and 5-epoch budget; one change per run; validation mean AUC.}\par\vspace{0.6em}
+\IfFileExists{tables/ablations.tex}{%
+\begin{center}\small\input{tables/ablations.tex}\end{center}
+\IfFileExists{figures/ablation_curves.png}{\begin{center}\includegraphics[height=9.5cm,width=0.75\textwidth,keepaspectratio]{ablation_curves.png}\end{center}}{}}{%
+Results not available yet.}
+
+\newpage
+{\Large\bfseries 11. Training prevalence and loss weights}\par\vspace{0.5em}
+\begin{center}\small\input{tables/classes.tex}\end{center}
+
+\newpage
+{\Large\bfseries 12. Grad-CAM examples}\par
+{\small\color{black!65} Original (left) and heatmap for the labelled disease (right). Confident test cases chosen for demonstration; localisation was not measured.}\par\vspace{0.4em}
+\begin{center}
+\includegraphics[width=0.82\textwidth]{gradcam_Cardiomegaly.png}\\[0.2em]
+\includegraphics[width=0.82\textwidth]{gradcam_Effusion.png}\\[0.2em]
+\includegraphics[width=0.82\textwidth]{gradcam_Emphysema.png}
+\end{center}
+\newpage
+\begin{center}
+\includegraphics[width=0.82\textwidth]{gradcam_Pneumothorax.png}\\[0.2em]
+\includegraphics[width=0.82\textwidth]{gradcam_Edema.png}\\[0.2em]
+\includegraphics[width=0.82\textwidth]{gradcam_Mass.png}
+\end{center}
+
+\slide{13. The web app}{Pick an example or upload an X-ray: 14 probabilities, latency, Grad-CAM for any disease (screenshot).}{app_2_cardiomegaly.png}{16.2cm}
+\slide{13b. The web app, other disease selected}{Any of the 14 diseases can be selected; heatmaps show where the model looked, not a diagnosis.}{app_3_effusion.png}{16.2cm}
+\end{document}
