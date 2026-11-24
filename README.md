@@ -114,8 +114,8 @@ Following the course milestones:
 - [x] DVC remote (DagsHub)
 - [x] `src/` pipeline (dataset, architecture, training with MLflow, evaluation + ONNX export, Grad-CAM)
 - [x] Test-set evaluation
-- [ ] Baseline comparison, augmentation and loss ablations (configs ready, runs pending)
+- [x] Ablations: frozen backbone vs fine-tuning vs plain BCE (5 epochs, see `results/ablations.csv`); strong augmentation not run
 - [x] FastAPI backend (`/health`, `/model/metadata`, `/predict`, `/predict/visualize`) with ONNX Runtime
 - [x] React frontend (upload, example gallery, webcam, probability bars, Grad-CAM overlay, latency)
 - [x] Docker Compose, GitHub Actions (lint, pytest, docker build)
-- [ ] LaTeX technical report
+- [x] LaTeX technical report (`report/main.pdf`), figures album (`report/visuals.pdf`) and cheat sheet (`report/cheatsheet.pdf`); build with `tectonic report/main.tex` from `report/`

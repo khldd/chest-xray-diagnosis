@@ -66,7 +66,7 @@ Research demo, not a diagnostic tool.
 
 \newpage
 {\Large\bfseries 10. Ablation study}\par
-{\small\color{black!65} Same data, split and 5-epoch budget; one change per run; validation mean AUC.}\par\vspace{0.6em}
+{\small\color{black!65} Same data, split and 5-epoch budget; one change per run. Fine-tuning matters (+0.09); plain BCE beat weighted BCE (0.836 vs 0.823), one seed.}\par\vspace{0.6em}
 \IfFileExists{tables/ablations.tex}{%
 \begin{center}\small\input{tables/ablations.tex}\end{center}
 \IfFileExists{figures/ablation_curves.png}{\begin{center}\includegraphics[height=9.5cm,width=0.75\textwidth,keepaspectratio]{ablation_curves.png}\end{center}}{}}{%
