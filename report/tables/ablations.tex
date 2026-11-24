@@ -1,0 +1,9 @@
+\begin{tabular}{llllrr}
+\toprule
+Run & Backbone & Loss & Augmentation & Best epoch & Val.\ mean AUC \\
+\midrule
+base\_5ep & fine-tuned & weighted\_bce & flip & 4/5 & 0.8231 \\
+baseline\_frozen & frozen & weighted\_bce & flip & 5/5 & 0.7338 \\
+unweighted\_bce & fine-tuned & bce & flip & 4/5 & 0.8360 \\
+\bottomrule
+\end{tabular}

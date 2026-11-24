@@ -1,0 +1,4 @@
+run,description,freeze_backbone,loss,augmentation,epochs,epochs_completed,best_epoch,best_val_auc,mean_epoch_seconds,auc_Atelectasis,auc_Cardiomegaly,auc_Consolidation,auc_Edema,auc_Effusion,auc_Emphysema,auc_Fibrosis,auc_Hernia,auc_Infiltration,auc_Mass,auc_Nodule,auc_Pleural_Thickening,auc_Pneumonia,auc_Pneumothorax
+base_5ep,"Fine-tuned, weighted BCE (reference)",False,weighted_bce,flip,5,5,4,0.8231,2158,0.7949,0.8659,0.8122,0.9107,0.8885,0.8752,0.778,0.9189,0.693,0.8347,0.7576,0.8114,0.732,0.8502
+baseline_frozen,"Frozen backbone, head only",True,weighted_bce,flip,5,5,5,0.7338,2037,0.7271,0.6986,0.7594,0.8722,0.8084,0.7519,0.7547,0.7794,0.6477,0.6887,0.6759,0.705,0.6376,0.7671
+unweighted_bce,"Fine-tuned, plain BCE",False,bce,flip,5,5,4,0.836,1834,0.8111,0.8974,0.81,0.9177,0.8997,0.8947,0.7925,0.9276,0.7131,0.8509,0.7681,0.8142,0.745,0.8622
