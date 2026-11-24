@@ -25,7 +25,7 @@
 \maketitle
 
 \begin{abstract}
-We train a DenseNet121 initialised from ImageNet to detect 14 thoracic diseases, each independently, from frontal chest X-rays of the NIH ChestX-ray14 dataset. A weighted binary cross-entropy loss compensates for severe class imbalance, and validation is done on a patient-wise split to avoid leakage. The model reaches a mean AUC of 0.831 on validation and \textbf{0.799 on the official test set} of 25{,}596 images. Grad-CAM heatmaps show which image regions drive each prediction. The model is exported to ONNX and served through a FastAPI backend with a React frontend, packaged with Docker Compose and checked by continuous integration. This is a research and educational demo, not a diagnostic tool.
+We train a DenseNet121 initialised from ImageNet to detect 14 thoracic diseases, each independently, from frontal chest X-rays of the NIH ChestX-ray14 dataset. A weighted binary cross-entropy loss is used against severe class imbalance (an ablation shows it did not improve AUC), and validation is done on a patient-wise split to avoid leakage. The model reaches a mean AUC of 0.831 on validation and \textbf{0.799 on the official test set} of 25{,}596 images. Grad-CAM heatmaps show which image regions drive each prediction. The model is exported to ONNX and served through a FastAPI backend with a React frontend, packaged with Docker Compose and checked by continuous integration. This is a research and educational demo, not a diagnostic tool.
 \end{abstract}
 
 \section{Introduction}
@@ -52,7 +52,8 @@ We use the NIH ChestX-ray14 dataset~\cite{wang2017chestxray}: 112{,}120 frontal 
 
 \paragraph{Model.} We use DenseNet121~\cite{huang2017densenet} pretrained on ImageNet and replace the 1000-way classifier with a linear layer from 1024 features to 14 outputs. All 6.97 million parameters are fine-tuned. Each output is passed through a sigmoid at inference time, giving an independent probability per disease.
 
-\paragraph{Loss.} Training uses binary cross-entropy with logits and a per-class positive weight $w_c = N^{-}_c / N^{+}_c$ computed on the training split (Table~\ref{tab:classes}), which ranges from 5.2 for Infiltration to 653 for Hernia. Without it, a model can reach a low loss by predicting ``absent'' for rare findings.
+\paragraph{Loss.} Training uses binary cross-entropy with logits and a per-class positive weight $w_c = N^{-}_c / N^{+}_c$ computed on the training split (Table~\ref{tab:classes}), which ranges from 5.2 for Infiltration to 653 for Hernia. The motivation is that a model can reach a low loss by predicting ``absent'' for rare findings; Section~
+ef{sec:ablations} tests whether this weighting actually helps.
 
 \paragraph{Optimisation.} Adam with learning rate $10^{-4}$, batch size 32, up to 15 epochs on a Kaggle T4 GPU. After every epoch the mean validation AUC is computed and the checkpoint with the best value is kept. The final pipeline writes the full training state (weights, optimiser, epoch, history) so a run can be resumed, and logs to MLflow.
 
@@ -72,6 +73,33 @@ The selected checkpoint reaches a mean AUC of \textbf{0.831} on the validation s
 \end{figure}
 
 The gap between validation and test is expected and we do not hide it. The best epoch was selected on the validation set, which makes that number slightly optimistic, and the test patients are different. The weakest classes include findings that are typically diffuse or ambiguous on a frontal film (Infiltration, Pneumonia, Consolidation). Hernia has the highest AUC despite having only 113 training positives; because it is the rarest class, its estimate is likely the least stable, and we did not compute confidence intervals.
+
+\subsection{Threshold metrics and calibration}
+\label{sec:calibration}
+AUC does not say how the model behaves as a yes/no detector. We therefore choose one cutoff per class on the validation set (maximising sensitivity plus specificity) and apply it unchanged to the test set (Table~\ref{tab:metrics}, Figure~\ref{fig:confusion}). At these cutoffs the mean sensitivity is 0.82 but the mean specificity is 0.62 and the mean precision only 0.14: the model ranks cases well but, because most findings are rare, it produces many false alarms. Average precision (mean 0.27) is far below the AUC (0.80) for the same reason; Pneumonia (AP 0.05) and Fibrosis (AP 0.09) are the extreme cases.
+
+\begin{table}[ht]
+\centering\small
+\input{tables/metrics.tex}
+\caption{Test-set metrics per class at the validation-chosen cutoff. AUC and AP (average precision) do not depend on the cutoff.}
+\label{tab:metrics}
+\end{table}
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.95\textwidth]{confusion_matrices.png}
+\caption{Per-class confusion matrices on the test set (cell values are counts and row percentages).}
+\label{fig:confusion}
+\end{figure}
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.88\textwidth]{calibration.png}
+\caption{Reliability diagram and score distribution on the test set. Scores are far above the observed frequency: the mean predicted score is 0.38 while 7.6\% of labels are positive.}
+\label{fig:calibration}
+\end{figure}
+
+The scores are strongly over-confident (Figure~\ref{fig:calibration}): the sigmoid outputs should be read as rankings, not as probabilities, and the interface values should not be quoted as certainty. The weighted loss is the likely cause (Section~\ref{sec:ablations}).
 
 \subsection{Ablations}
 \label{sec:ablations}
@@ -122,14 +150,14 @@ Uploads are decoded for real, not trusted by file type: non-images are rejected 
   \item \textbf{Not a medical device.} The system is a research and educational demo. It must not be used for diagnosis, and the interface says so.
   \item \textbf{Label noise.} Labels are machine-extracted from reports, so reported AUCs measure agreement with noisy labels, not with a radiologist's ground truth.
   \item \textbf{Single dataset, single hospital.} We did no external validation, so performance on other populations and scanners is unknown.
-  \item \textbf{Single run, no confidence intervals.} Results come from one training run and one seed; differences of a few thousandths of AUC are not meaningful.
+  \item \textbf{Single run, no confidence intervals.} Results come from one training run and one seed per setting; differences of a few thousandths of AUC are not meaningful, and the 0.013 advantage of plain over weighted loss in the ablation is suggestive only.
   \item \textbf{Low resolution.} Images are reduced to $224\times224$, which can hide small findings such as nodules.
-  \item \textbf{No calibration study.} The sigmoid outputs rank cases well (AUC) but are not calibrated probabilities.
+  \item \textbf{Over-confident, uncalibrated scores and low precision.} The outputs rank cases well but are not probabilities (mean score 0.38 against 7.6\% prevalence), and at a useful sensitivity the precision is low (mean 0.14). No recalibration was applied.
   \item \textbf{Horizontal flip.} Flipping moves the heart to the wrong side of the image, which may matter for findings such as Cardiomegaly.
 \end{itemize}
 
 \section{Conclusion}
-We built an end-to-end system: a leakage-free training pipeline, a DenseNet121 classifier with a mean test AUC of 0.799, visual explanations, and a tested, containerised application. Natural next steps are higher input resolution, a stronger backbone, label-noise-aware training, calibration, quantitative evaluation of the heatmaps, and external validation.
+We built an end-to-end system: a leakage-free training pipeline, a DenseNet121 classifier with a mean test AUC of 0.799, visual explanations, and a tested, containerised application. Ablations show that fine-tuning is essential and that plain cross-entropy matched or beat our weighted loss, so retraining the main model without class weights and recalibrating its scores is the most direct improvement. Other natural next steps are higher input resolution, a stronger backbone, label-noise-aware training, calibration, quantitative evaluation of the heatmaps, and external validation.
 
 \begin{thebibliography}{9}
 \bibitem{wang2017chestxray} X.~Wang, Y.~Peng, L.~Lu, Z.~Lu, M.~Bagheri, R.~Summers. ChestX-ray8: Hospital-scale chest X-ray database and benchmarks on weakly-supervised classification and localization of common thorax diseases. \emph{CVPR}, 2017.

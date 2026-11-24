@@ -42,11 +42,11 @@ Training & 15 epochs, Adam, lr $10^{-4}$ & Speed & 25\,ms per image (CPU) \\
 
 \textbf{Why AUC and not accuracy?} Rare diseases (Hernia 0.15\%): predicting ``healthy'' always is 99\% accurate and useless. AUC measures how well the model ranks sick above healthy.
 
-\textbf{Why weighted loss?} Without it the model ignores rare diseases. Each positive counts $N_{neg}/N_{pos}$ times (5 to 653).
+\textbf{Why weighted loss?} The idea: rare diseases would be ignored, so each positive counts $N_{neg}/N_{pos}$ times (5 to 653). \textbf{But our ablation showed it did not help AUC} (plain loss 0.836 vs weighted 0.823, better in 13 of 14 classes) and it makes scores over-confident. Say this openly: it is a real finding.
 
 \textbf{What is an ablation?} Retrain with one choice removed and compare, to measure what that choice is worth.
 
-\textbf{Overfitting?} Validation 0.831 vs test 0.799: small gap, expected (best epoch picked on validation). We have no per-epoch curve for the 15-epoch run.
+\textbf{Overfitting?} Test gap is small (0.831 vs 0.799, best epoch picked on validation). In the 5-epoch reference run, validation loss rises after epoch 2--3 while training loss keeps falling, and AUC peaks at epoch 4: overfitting starts early. We have no curve for the 15-epoch run.
 
 \textbf{Is 0.799 good?} Reasonable for plain DenseNet121 at 224\,px. Published results are a bit higher. Next steps: higher resolution, stronger backbone.
 
@@ -54,10 +54,16 @@ Training & 15 epochs, Adam, lr $10^{-4}$ & Speed & 25\,ms per image (CPU) \\
 
 \textbf{Usable clinically?} No. Noisy labels, one dataset, no external validation, one run, no calibration.
 
-\section*{Ablation result}
+\section*{Ablation results (5 epochs each, validation AUC)}
+\begin{tabular}{@{}lr@{\quad}l@{}}
+Fine-tuned, weighted loss (reference) & 0.823 & our recipe \\
+Frozen backbone, last layer only & 0.734 & fine-tuning is essential (+0.09) \\
+Fine-tuned, plain loss & \textbf{0.836} & better than our weighted loss \\
+\end{tabular}
 \begin{itemize}
-  \item \textbf{Frozen backbone} (only last layer trains): validation AUC \textbf{0.734} after 5 epochs, still rising. Fine-tuning the whole network is clearly needed.
-  \item Same-budget reference and the weighted-vs-plain loss comparison: see the visuals file, slide ``10. Ablation study'' (only if the Kaggle runs finished).
+  \item \textbf{Fine-tuning matters a lot.} Frozen still improves but is far behind.
+  \item \textbf{Weighting did not help} (+0.013 for plain loss, every epoch, 13/14 classes). One seed, so suggestive, not proven. A 5-epoch plain-loss run already beats the 15-epoch main model's validation AUC (0.836 vs 0.831); not tested on the test set.
+  \item Strong augmentation was configured but dropped to save GPU time: no claim about it.
 \end{itemize}
 
 \section*{Honest weak spots (we measured them)}
