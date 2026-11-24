@@ -1,0 +1,88 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage[margin=1.9cm]{geometry}
+\usepackage{booktabs,enumitem,xcolor,titlesec}
+\usepackage[colorlinks=true,urlcolor=blue!50!black]{hyperref}
+\pagestyle{empty}
+\setlength{\parindent}{0pt}\setlength{\parskip}{0.35em}
+\setlist{nosep,leftmargin=1.1em}
+\titleformat{\section}{\large\bfseries\color{blue!45!black}}{}{0pt}{}
+\titlespacing*{\section}{0pt}{0.9em}{0.3em}
+
+\begin{document}
+{\LARGE\bfseries Cheat sheet}\hfill{\small Chest X-ray Diagnosis}\par
+{\small Read once. Everything here is true and checked.}
+
+\section*{The pitch (30 seconds)}
+\begin{itemize}
+  \item We detect \textbf{14 chest diseases} from an X-ray, several can be present at once.
+  \item A DenseNet121 (pretrained on ImageNet, fine-tuned) gets \textbf{0.799 AUC} on the official test set.
+  \item Grad-CAM heatmaps show where the model looked. It runs as a web app with tests and CI.
+\end{itemize}
+
+\section*{Numbers to remember}
+\begin{tabular}{@{}ll@{\qquad}ll@{}}
+Images & 112,120 (30,805 patients) & Val AUC & \textbf{0.831} \\
+Train / val / test & 73,916 / 12,608 / 25,596 & Test AUC & \textbf{0.799} \\
+Model size & 7.0\,M parameters & Best / worst class & Hernia 0.93 / Pneumonia 0.69 \\
+Training & 15 epochs, Adam, lr $10^{-4}$ & Speed & 25\,ms per image (CPU) \\
+\end{tabular}
+
+\section*{What is ours, honestly}
+\begin{itemize}
+  \item The \textbf{model was trained by the team} in the notebook (15 epochs). We did not invent a new architecture.
+  \item We added: a reproducible, tested pipeline, honest test evaluation, Grad-CAM, ONNX, the API, the UI, Docker, CI, DVC, and the report.
+  \item The \textbf{ablations} are new training runs (5 epochs each) on Kaggle.
+\end{itemize}
+
+\section*{Questions you will get}
+\textbf{Why split by patient?} One patient has up to 184 images. A random split puts the same person in train and validation, so the model recognises the person instead of the disease and the score is inflated.
+
+\textbf{Why AUC and not accuracy?} Rare diseases (Hernia 0.15\%): predicting ``healthy'' always is 99\% accurate and useless. AUC measures how well the model ranks sick above healthy.
+
+\textbf{Why weighted loss?} Without it the model ignores rare diseases. Each positive counts $N_{neg}/N_{pos}$ times (5 to 653).
+
+\textbf{What is an ablation?} Retrain with one choice removed and compare, to measure what that choice is worth.
+
+\textbf{Overfitting?} Validation 0.831 vs test 0.799: small gap, expected (best epoch picked on validation). We have no per-epoch curve for the 15-epoch run.
+
+\textbf{Is 0.799 good?} Reasonable for plain DenseNet121 at 224\,px. Published results are a bit higher. Next steps: higher resolution, stronger backbone.
+
+\textbf{Why is Pneumonia weak?} Diffuse and ambiguous on a frontal film; labels were machine-extracted from reports (noisy).
+
+\textbf{Usable clinically?} No. Noisy labels, one dataset, no external validation, one run, no calibration.
+
+\section*{Ablation result}
+\begin{itemize}
+  \item \textbf{Frozen backbone} (only last layer trains): validation AUC \textbf{0.734} after 5 epochs, still rising. Fine-tuning the whole network is clearly needed.
+  \item Same-budget reference and the weighted-vs-plain loss comparison: see the visuals file, slide ``10. Ablation study'' (only if the Kaggle runs finished).
+\end{itemize}
+
+\section*{Honest weak spots (we measured them)}
+\begin{itemize}
+  \item \textbf{Precision is low.} At a cutoff that catches 82\% of sick cases (mean sensitivity), specificity is 0.62 and precision only 0.14 on average. Good at ranking, noisy as a yes/no alarm.
+  \item \textbf{Scores are not probabilities.} Mean predicted 0.38 vs 0.076 real positives: the weighted loss makes the model over-confident. The app's ``99.9\%'' means ``scores very high'', not ``99.9\% sure''.
+  \item Hernia has the best AUC (0.93) but only 0.3\% prevalence in test, so precision is tiny.
+\end{itemize}
+
+\section*{Do not say}
+\begin{tabular}{@{}p{0.46\textwidth}p{0.48\textwidth}@{}}
+\toprule
+Don't say & Say instead \\
+\midrule
+``It diagnoses diseases'' & ``Research demo; it ranks likelihoods, not a diagnosis'' \\
+``99.9\% sure'' & ``It scores very high; scores are not calibrated'' \\
+``Grad-CAM proves it looks at the right place'' & ``Plausibility check; localisation was not measured'' \\
+``We built the model'' & ``The team trained it; we built the pipeline around it'' \\
+``The webcam works'' & ``Implemented; not yet tested on a real camera'' (until you test it) \\
+\bottomrule
+\end{tabular}
+
+\section*{Demo (2 minutes)}
+Open the app $\to$ click the Cardiomegaly example $\to$ read bars and latency $\to$ click Cardiomegaly for the heatmap $\to$ show Hernia is low (it does not flag everything). Say the gallery images are confident test cases.
+
+\vfill
+{\footnotesize Repo: github.com/khldd/chest-xray-diagnosis \quad|\quad Full report: report/main.pdf \quad|\quad Visuals: report/visuals.pdf}
+\end{document}
