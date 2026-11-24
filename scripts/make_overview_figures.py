@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Overview figures for the report: class imbalance, data split and system architecture.
 
 Numbers come from the verified project data (scripts/make_report_tables.py and the official
@@ -42,7 +43,7 @@ def class_imbalance() -> None:
     weight = [(N_TRAIN - v) / v for _, v in items]
     fig, ax = plt.subplots(figsize=(7.5, 5.2))
     bars = ax.barh(names, prev, color=BLUE)
-    for b, p, w in zip(bars, prev, weight):
+    for b, p, w in zip(bars, prev, weight, strict=True):
         ax.text(b.get_width() + 0.2, b.get_y() + b.get_height() / 2,
                 f"{p:.2f}%   (loss weight x{w:.0f})", va="center", fontsize=8)
     ax.set(xlabel="Share of training images with the finding (%)", xlim=(0, 24),

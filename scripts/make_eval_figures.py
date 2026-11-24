@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Draw the standard evaluation figures from saved model predictions.
 
 Input: predictions.npz produced by the kaggle/eval_predictions kernel
@@ -113,7 +114,7 @@ def plot_pr(test_p, test_y, rows):
 
 def plot_confusions(rows):
     fig, axes = plt.subplots(4, 4, figsize=(11, 11))
-    for ax, r in zip(axes.ravel(), rows):
+    for ax, r in zip(axes.ravel(), rows, strict=False):
         cm = np.array([[r["tn"], r["fp"]], [r["fn"], r["tp"]]])
         norm = cm / cm.sum(axis=1, keepdims=True).clip(min=1)  # row-normalised: spec/sens
         ax.imshow(norm, cmap="Blues", vmin=0, vmax=1)
