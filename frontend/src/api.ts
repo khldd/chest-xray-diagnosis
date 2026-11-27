@@ -10,8 +10,27 @@ export interface Prediction {
   probabilities: Record<string, number>;
   top: TopItem[];
   latency_ms: number;
+  model?: string;
   disease?: string;
   overlay_png_base64?: string;
+}
+
+export interface ModelEntry {
+  model_id: string;
+  model_name: string;
+  display_name: string;
+  default: boolean;
+  calibrated: boolean;
+  val_mean_auc?: number | null;
+  test_mean_auc?: number | null;
+  n_parameters?: number | null;
+  temperature?: number;
+  ensemble_of?: string[] | null;
+}
+
+export interface Comparison {
+  disease: string | null;
+  results: Prediction[];
 }
 
 export interface ModelMetadata {
@@ -50,14 +69,27 @@ function upload(file: Blob, filename: string): RequestInit {
   return { method: "POST", body: form };
 }
 
-export const predict = (file: Blob, filename = "xray.png") =>
-  request<Prediction>("/predict", upload(file, filename));
+function query(params: Record<string, string | null | undefined>): string {
+  const q = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) if (v) q.set(k, v);
+  const s = q.toString();
+  return s ? `?${s}` : "";
+}
 
-export const visualize = (file: Blob, disease: string, filename = "xray.png") =>
-  request<Prediction>(
-    `/predict/visualize?disease=${encodeURIComponent(disease)}`,
-    upload(file, filename),
-  );
+export const predict = (file: Blob, model?: string | null, filename = "xray.png") =>
+  request<Prediction>(`/predict${query({ model })}`, upload(file, filename));
+
+export const visualize = (
+  file: Blob,
+  disease: string,
+  model?: string | null,
+  filename = "xray.png",
+) => request<Prediction>(`/predict/visualize${query({ disease, model })}`, upload(file, filename));
+
+export const compare = (file: Blob, disease?: string | null, filename = "xray.png") =>
+  request<Comparison>(`/predict/compare${query({ disease })}`, upload(file, filename));
+
+export const getModels = () => request<ModelEntry[]>("/models");
 
 export const getMetadata = () => request<ModelMetadata>("/model/metadata");
 

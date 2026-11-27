@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { getMetadata, type ModelMetadata } from "../api";
+import { getMetadata, type ModelEntry, type ModelMetadata } from "../api";
 
-export default function ModelInfo() {
+/** Facts about the model in use: the selected registry entry, or the API's default model. */
+export default function ModelInfo({ model }: { model: ModelEntry | null }) {
   const [meta, setMeta] = useState<ModelMetadata | null>(null);
   const [offline, setOffline] = useState(false);
 
@@ -14,20 +15,28 @@ export default function ModelInfo() {
   if (offline) return <p className="error small">API unreachable: start the backend.</p>;
   if (!meta) return <p className="muted small">Connecting to the API…</p>;
 
-  const fmt = (v: number | null) => (v === null ? "not evaluated yet" : v.toFixed(3));
+  const fmt = (v?: number | null) => (v === null || v === undefined ? "–" : v.toFixed(3));
+  const name = model?.display_name ?? meta.model_name;
+  const val = model ? model.val_mean_auc : meta.val_mean_auc;
+  const test = model ? model.test_mean_auc : meta.test_mean_auc;
+  const calibrated = model?.calibrated ?? false;
   return (
     <ul className="meta">
       <li>
-        <span>Model</span> {meta.model_name} · {meta.classes.length} classes · {meta.input_size}px
+        <span>Model</span> {name} · {meta.classes.length} classes · {meta.input_size}px
+        {model?.n_parameters ? ` · ${(model.n_parameters / 1e6).toFixed(1)}M params` : ""}
       </li>
-      <li>
-        <span>Mean AUC</span> val {fmt(meta.val_mean_auc)} · test {fmt(meta.test_mean_auc)}
-      </li>
-      {meta.onnx_sha256 && (
+      {model?.model_id !== "ensemble" && (
         <li>
-          <span>ONNX</span> sha256 {meta.onnx_sha256.slice(0, 12)}
+          <span>Mean AUC</span> val {fmt(val)} · test {fmt(test)}
         </li>
       )}
+      <li>
+        <span>Scores</span>{" "}
+        {calibrated
+          ? "calibrated on validation (temperature scaling): read them as probabilities"
+          : "not calibrated: a ranking score, not a probability"}
+      </li>
     </ul>
   );
 }
