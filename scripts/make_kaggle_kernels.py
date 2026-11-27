@@ -1,7 +1,11 @@
 """Generate kaggle/<run>/ kernel folders (script + metadata) from kaggle/run_template.py.
 
-Usage (repo root):  python scripts/make_kaggle_kernels.py [--branch main] [run ...]
+Usage (repo root):  python scripts/make_kaggle_kernels.py [--branch main] [--owner USER] [run ...]
 Then launch one:    kaggle kernels push -p kaggle/base_5ep
+
+A run name is a config in configs/<run>.yaml (ablations, kernel cxr-ablation-*) or in
+configs/bench/<run>.yaml (architecture study, kernel cxr-bench-*). --owner puts the kernel
+under another Kaggle account (a teammate pushing with their own credentials).
 """
 from __future__ import annotations
 
@@ -18,19 +22,24 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("runs", nargs="*", default=DEFAULT_RUNS)
     ap.add_argument("--branch", default="main", help="git branch the kernel clones")
+    ap.add_argument("--owner", default=KAGGLE_USER, help="Kaggle account that runs the kernel")
     args = ap.parse_args()
 
     template = (ROOT / "kaggle" / "run_template.py").read_text(encoding="utf-8")
     for run in args.runs:
-        assert (ROOT / "configs" / f"{run}.yaml").exists(), f"no config for {run}"
-        slug = "cxr-ablation-" + run.replace("_", "-")
-        folder = ROOT / "kaggle" / run
+        if (ROOT / "configs" / f"{run}.yaml").exists():
+            config, slug, folder = f"configs/{run}.yaml", "cxr-ablation-", ROOT / "kaggle" / run
+        elif (ROOT / "configs" / "bench" / f"{run}.yaml").exists():
+            config, slug = f"configs/bench/{run}.yaml", "cxr-bench-"
+            folder = ROOT / "kaggle" / "bench" / run
+        else:
+            raise SystemExit(f"no config for {run}")
+        slug += run.replace("_", "-")
         folder.mkdir(parents=True, exist_ok=True)
-        (folder / "run.py").write_text(
-            template.replace("__RUN__", run).replace("__BRANCH__", args.branch), encoding="utf-8"
-        )
+        script = template.replace("__RUN__", run).replace("__CONFIG__", config)
+        (folder / "run.py").write_text(script.replace("__BRANCH__", args.branch), encoding="utf-8")
         metadata = {
-            "id": f"{KAGGLE_USER}/{slug}",
+            "id": f"{args.owner}/{slug}",
             "title": slug,
             "code_file": "run.py",
             "language": "python",

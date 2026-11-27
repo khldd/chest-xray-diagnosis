@@ -13,7 +13,7 @@ class ChestXrayDataset(Dataset):
         self,
         df: pd.DataFrame,
         labels: np.ndarray,
-        image_path_lookup: dict[str, str],
+        image_path_lookup,  # dict filename -> path, or src.data.cache.CachedImages
         transform,
     ):
         self.filenames = df["Image Index"].tolist()
@@ -25,6 +25,9 @@ class ChestXrayDataset(Dataset):
         return len(self.filenames)
 
     def __getitem__(self, idx: int):
-        path = self.lookup[self.filenames[idx]]
-        image = Image.open(path).convert("RGB")  # grayscale X-ray -> 3 channels for the CNN
+        name = self.filenames[idx]
+        if hasattr(self.lookup, "open"):  # src.data.cache.CachedImages: pre-resized memmap
+            image = self.lookup.open(name)
+        else:
+            image = Image.open(self.lookup[name]).convert("RGB")  # grayscale X-ray -> 3 channels
         return self.transform(image), torch.tensor(self.labels[idx], dtype=torch.float32)

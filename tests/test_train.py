@@ -80,3 +80,46 @@ def test_write_metrics_picks_best_epoch(tmp_path):
     ]
     out = train.write_metrics(str(tmp_path / "m.json"), "r", {}, history, 0.8, {"Mass": 0.8})
     assert out["best_epoch"] == 2
+
+
+
+def test_train_benchmark_extras(monkeypatch, tmp_path):
+    """Cache + seed + predictions + localisation on a fake dataset with a test split and boxes."""
+    root = tmp_path / "nih"
+    make_fake_nih(root)
+    names = (root / "train_val_list.txt").read_text(encoding="utf-8").split()
+    (root / "train_val_list.txt").write_text("\n".join(names[:36]), encoding="utf-8")
+    rows = ["Image Index,Finding Label,Bbox [x,y,w,h],,,"]
+    rows += [f"{n},Infiltrate,5,5,20,20" for n in names[36:40]]
+    rows += [f"{n},Mass,1,1,10,10" for n in names[:36]]  # mostly training images: excluded
+    (root / "BBox_List_2017.csv").write_text("\n".join(rows) + "\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+    cfg = tmp_path / "bench.yaml"
+    out = tmp_path / "out"
+    cfg.write_text(
+        "data:\n  img_size: 64\n  batch_size: 8\n  num_workers: 0\n  cache: true\n"
+        f"  cache_dir: {(tmp_path / 'cache').as_posix()}\n  cache_workers: 1\n"
+        "model:\n  name: resnet50\n  pretrained: false\n"
+        "train:\n  epochs: 1\n  loss: bce\n  seed: 3\n  predict: true\n  localize: true\n"
+        f"  output_dir: {out.as_posix()}\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(sys, "argv", ["train", "--config", str(cfg), "--data-root", str(root)])
+    train.main()
+
+    metrics = json.loads((out / "metrics.json").read_text(encoding="utf-8"))
+    assert metrics["arch"] == "resnet50" and metrics["n_parameters"] > 1e7
+    preds = np.load(out / "predictions.npz")
+    assert preds["test_probs"].shape == (12, 14)
+    assert len(preds["val_names"]) == len(preds["val_labels"])
+    assert "test_patient" in preds.files
+    loc = json.loads((out / "localization.json").read_text(encoding="utf-8"))
+    assert loc["n_boxes_total"] == 40 and loc["n_excluded_in_train"] >= 20
+    assert loc["overall"]["n"] == 40 - loc["n_excluded_in_train"]
+
+
+def test_seed_makes_shuffling_reproducible():
+    a = torch.randperm(100, generator=train.seed_everything(7))
+    b = torch.randperm(100, generator=train.seed_everything(7))
+    assert torch.equal(a, b)
