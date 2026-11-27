@@ -271,11 +271,9 @@ def run_localization(model, arch, d, images, eval_tf, tr_df, t) -> dict:
         print("localization skipped: BBox_List_2017.csv not found", flush=True)
         return {"skipped": True}
     meta = load_metadata(d["root"])
-    sizes = {}
-    if "OriginalImage[Width" in meta.columns:
-        sizes = dict(zip(meta["Image Index"], zip(meta["OriginalImage[Width"], meta["Height]"],
-                                                     strict=True), strict=True))
-    boxes = load_boxes(d["root"], sizes)
+    # Box coordinates refer to the released 1024x1024 PNGs, NOT to the original scan size in
+    # Data_Entry_2017.csv (OriginalImage[Width, Height]), so no per-image size is passed.
+    boxes = load_boxes(d["root"])
     allowed = set(meta["Image Index"]) - set(tr_df["Image Index"])
     result = score_localization(model, arch, boxes, images, eval_tf, d["img_size"], allowed)
     with open(os.path.join(t["output_dir"], "localization.json"), "w", encoding="utf-8") as f:

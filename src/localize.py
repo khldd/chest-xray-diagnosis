@@ -24,7 +24,11 @@ BOX_NAMES = {"Infiltrate": "Infiltration"}  # BBox_List spelling -> Data_Entry s
 
 
 def load_boxes(root: str, sizes: dict[str, tuple[int, int]] | None = None) -> pd.DataFrame:
-    """Return one row per box: image, disease, x, y, w, h (original pixels), width, height."""
+    """Return one row per box: image, disease, x, y, w, h, width, height.
+
+    Coordinates are in the pixels of the released PNGs, which are all 1024x1024. `sizes` only
+    overrides that for images of another size (tests); do not pass the original scan sizes.
+    """
     raw = pd.read_csv(os.path.join(root, "BBox_List_2017.csv"))
     df = raw.iloc[:, :6].copy()
     df.columns = ["image", "disease", "x", "y", "w", "h"]
@@ -104,3 +108,39 @@ def score_localization(
     result["n_excluded_in_train"] = int(len(boxes) - len(keep))
     result["boxes"] = rows
     return result
+
+
+def main() -> None:
+    """Score saved weights without retraining: python -m src.localize --weights W --arch A."""
+    import argparse
+    import json
+
+    from src.data.prepare import build_image_lookup, load_metadata, make_splits
+    from src.data.transforms import eval_transforms
+    from src.models.factory import build_model
+
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument("--weights", required=True)
+    ap.add_argument("--arch", default="densenet121")
+    ap.add_argument("--data-root", required=True)
+    ap.add_argument("--out", required=True)
+    ap.add_argument("--img-size", type=int, default=224)
+    args = ap.parse_args()
+
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    model = build_model(args.arch, pretrained=False)
+    model.load_state_dict(torch.load(args.weights, map_location=device))
+    model = model.to(device)
+    train_names = set(make_splits(args.data_root)["train"][0]["Image Index"])
+    allowed = set(load_metadata(args.data_root)["Image Index"]) - train_names
+    result = score_localization(
+        model, args.arch, load_boxes(args.data_root), build_image_lookup(args.data_root),
+        eval_transforms(args.img_size), args.img_size, allowed,
+    )
+    with open(args.out, "w", encoding="utf-8") as f:
+        json.dump(result, f, indent=2)
+    print(args.arch, json.dumps(result["overall"]))
+
+
+if __name__ == "__main__":
+    main()
