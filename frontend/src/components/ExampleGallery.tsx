@@ -7,12 +7,13 @@ interface Example {
 
 interface Props {
   disabled: boolean;
-  onPick: (blob: Blob) => void;
+  active: string | null;
+  onPick: (blob: Blob, name: string) => void;
 }
 
 // Images live in public/examples/ and are listed in public/examples/manifest.json:
 //   [{ "file": "00000001_000.png", "label": "Cardiomegaly" }, ...]
-export default function ExampleGallery({ disabled, onPick }: Props) {
+export default function ExampleGallery({ disabled, active, onPick }: Props) {
   const [examples, setExamples] = useState<Example[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -20,7 +21,7 @@ export default function ExampleGallery({ disabled, onPick }: Props) {
     fetch("/examples/manifest.json")
       .then((r) => (r.ok ? r.json() : []))
       .then((data) => setExamples(Array.isArray(data) ? data : []))
-      .catch(() => setExamples([])); // no manifest (or not JSON): hide the gallery
+      .catch(() => setExamples([])); // no manifest (or not JSON): hide the list
   }, []);
 
   if (examples.length === 0) return null;
@@ -30,31 +31,37 @@ export default function ExampleGallery({ disabled, onPick }: Props) {
     try {
       const res = await fetch(`/examples/${encodeURIComponent(ex.file)}`);
       if (!res.ok) throw new Error();
-      onPick(await res.blob());
+      onPick(await res.blob(), ex.file);
     } catch {
       setError(`Could not load ${ex.file}`);
     }
   };
 
   return (
-    <section className="panel gallery">
-      <h2>Try an example</h2>
-      <div className="thumbs">
-        {examples.map((ex) => (
-          <button
-            key={ex.file}
-            type="button"
-            className="thumb"
-            disabled={disabled}
-            onClick={() => pick(ex)}
-            title={ex.label}
-          >
-            <img src={`/examples/${encodeURIComponent(ex.file)}`} alt={ex.label} loading="lazy" />
-            <span>{ex.label}</span>
-          </button>
-        ))}
+    <nav className="studies" aria-label="Example studies">
+      <div className="rail-head">
+        <span className="eyebrow">Test-set studies</span>
+        <span className="count">{examples.length}</span>
       </div>
+      <ul>
+        {examples.map((ex) => (
+          <li key={ex.file}>
+            <button
+              type="button"
+              className={`study${active === ex.file ? " active" : ""}`}
+              disabled={disabled}
+              onClick={() => pick(ex)}
+            >
+              <img src={`/examples/${encodeURIComponent(ex.file)}`} alt="" loading="lazy" />
+              <span className="study-text">
+                <span className="study-label">{ex.label.replace("_", " ")}</span>
+                <span className="study-file">{ex.file.replace(".png", "")}</span>
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
       {error && <p className="error small">{error}</p>}
-    </section>
+    </nav>
   );
 }

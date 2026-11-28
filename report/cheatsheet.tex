@@ -76,12 +76,11 @@ Don't say & Say instead \\
 ``ConvNeXt is significantly the best'' & ``Best on the test set; its lead over DenseNet is close to seed noise'' \\
 ``Grad-CAM proves it looks at the right place'' & ``ConvNeXt points into the expert box 44\% of the time, twice the centre baseline; others barely beat it'' \\
 ``Docker trains the model'' & ``Docker serves it; training is on Kaggle GPUs'' \\
-``The webcam works'' & ``Implemented; not yet tested on a real camera'' (until you test it) \\
 \bottomrule
 \end{tabular}
 
 \section*{Demo (3 minutes)}
-\texttt{docker compose up}, open \texttt{localhost:8080} $\to$ point at the model pills (test AUC on each) $\to$ click the Cardiomegaly example $\to$ read the calibrated probabilities $\to$ click \emph{Compare all models}: four heatmaps + ensemble; note EfficientNet looks elsewhere, which matches its localisation score $\to$ switch to \emph{Ensemble}.
+\texttt{docker compose up}, open \texttt{localhost:8080} $\to$ point at the model switcher (test AUC on each) $\to$ click the Cardiomegaly study $\to$ read the calibrated probabilities, drag the slider over the heart $\to$ click another finding (e.g.\ Effusion) to move the heatmap $\to$ \emph{Compare all models}: 4/4 rank Cardiomegaly first, scores 81--92\%; note EfficientNet looks elsewhere, which matches its localisation score $\to$ switch to \emph{Ensemble}.
 
 \vfill
 {\footnotesize Repo: github.com/khldd/chest-xray-diagnosis \quad|\quad Report: report/main.pdf \quad|\quad Visuals: report/visuals.pdf}

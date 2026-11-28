@@ -7,27 +7,33 @@ interface Props {
   onChange: (id: string) => void;
 }
 
-const auc = (v?: number | null) => (v === null || v === undefined ? "–" : v.toFixed(3));
+const auc = (v?: number | null) => (v === null || v === undefined ? null : v.toFixed(3));
 
-/** One pill per served model (plus the ensemble), with its test AUC. */
+/** Segmented control: one segment per served model plus the ensemble, with its test AUC. */
 export default function ModelSelector({ models, value, disabled, onChange }: Props) {
   if (models.length < 2) return null;
   return (
-    <div className="models">
-      <span className="muted small">Model</span>
-      {models.map((m) => (
-        <button
-          key={m.model_id}
-          type="button"
-          className={`pill${value === m.model_id ? " active" : ""}`}
-          disabled={disabled}
-          onClick={() => onChange(m.model_id)}
-          title={m.display_name}
-        >
-          {m.model_id === "ensemble" ? "Ensemble" : m.display_name}
-          {m.test_mean_auc != null && <small> AUC {auc(m.test_mean_auc)}</small>}
-        </button>
-      ))}
+    <div className="segmented" role="radiogroup" aria-label="Model">
+      {models.map((m) => {
+        const active = value === m.model_id;
+        const score = auc(m.test_mean_auc);
+        return (
+          <button
+            key={m.model_id}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            className={`segment${active ? " active" : ""}`}
+            disabled={disabled}
+            onClick={() => onChange(m.model_id)}
+          >
+            <span className="segment-name">
+              {m.model_id === "ensemble" ? "Ensemble" : m.display_name}
+            </span>
+            <span className="segment-sub">{score ? `AUC ${score}` : "mean of 4"}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }

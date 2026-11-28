@@ -10,15 +10,16 @@ import {
 } from "./api";
 import CompareView from "./components/CompareView";
 import ExampleGallery from "./components/ExampleGallery";
-import GradcamPanel from "./components/GradcamPanel";
+import Findings from "./components/Findings";
+import { AlertIcon, LungsIcon } from "./components/Icons";
 import ModelInfo from "./components/ModelInfo";
 import ModelSelector from "./components/ModelSelector";
-import ProbabilityBars from "./components/ProbabilityBars";
-import UploadPanel from "./components/UploadPanel";
+import Viewer from "./components/Viewer";
 
 export default function App() {
   const [file, setFile] = useState<Blob | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [sourceName, setSourceName] = useState<string | null>(null);
   const [result, setResult] = useState<Prediction | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -96,7 +97,7 @@ export default function App() {
     }
   };
 
-  const analyze = async (blob: Blob, modelId = model) => {
+  const analyze = async (blob: Blob, modelId = model, name?: string) => {
     const id = ++predictRun.current;
     overlayRun.current++; // cancel any heatmap still in flight for the previous image
     compareRun.current++;
@@ -105,6 +106,7 @@ export default function App() {
     if (blob !== file) {
       setFile(blob);
       setPreviewUrl(URL.createObjectURL(blob));
+      setSourceName(name ?? "Uploaded image");
     }
     setResult(null);
     setSelected(null);
@@ -130,14 +132,20 @@ export default function App() {
     }
   };
 
+  const current = models.find((m) => m.model_id === model) ?? null;
+
   return (
-    <main className="container">
-      <header>
-        <h1>Chest X-ray Diagnosis</h1>
-        <p className="disclaimer">
-          Research and educational demo. Not a diagnostic tool and not medical advice.
-        </p>
-        <ModelInfo model={models.find((m) => m.model_id === model) ?? null} />
+    <div className="app">
+      <header className="topbar">
+        <div className="brand">
+          <span className="brand-mark">
+            <LungsIcon />
+          </span>
+          <div>
+            <span className="brand-name">Chest X-ray Diagnosis</span>
+            <span className="brand-sub">14 thoracic findings · NIH ChestX-ray14</span>
+          </div>
+        </div>
         <ModelSelector
           models={models}
           value={model}
@@ -147,57 +155,51 @@ export default function App() {
             if (file) void analyze(file, id);
           }}
         />
+        <span
+          className="disclaimer"
+          title="Research and educational demo. Not a diagnostic tool and not medical advice."
+        >
+          <AlertIcon /> Research demo · not for diagnosis
+        </span>
       </header>
 
-      <ExampleGallery disabled={loading} onPick={analyze} />
+      <ModelInfo model={current} />
 
-      <div className="grid">
-        <UploadPanel previewUrl={previewUrl} disabled={loading} onFile={analyze} />
+      <main className="workspace">
+        <aside className="rail">
+          <ExampleGallery
+            disabled={loading}
+            active={sourceName}
+            onPick={(blob, name) => void analyze(blob, model, name)}
+          />
+        </aside>
 
-        <section className="panel">
-          <h2>Predictions</h2>
-          {error && <p className="error">{error}</p>}
-          {loading && <p className="muted">Analyzing…</p>}
-          {!loading && !error && !result && (
-            <p className="muted">Upload an X-ray to see the 14 disease probabilities.</p>
-          )}
-          {result && (
-            <>
-              <p className="muted small">Click a disease to see where the model looked.</p>
-              <ProbabilityBars
-                probabilities={result.probabilities}
-                selected={selected}
-                onSelect={(d) => file && loadOverlay(file, d)}
-              />
-              <p className="muted small latency">
-                Inference {result.latency_ms} ms on the server
-                {roundTripMs !== null && <> · {roundTripMs} ms round trip</>}
-              </p>
-              {models.length > 1 && file && (
-                <button
-                  type="button"
-                  className="btn"
-                  disabled={compareLoading}
-                  onClick={() => void runCompare(file, selected)}
-                >
-                  Compare all models{selected && ` on ${selected.replace("_", " ")}`}
-                </button>
-              )}
-            </>
-          )}
-        </section>
-      </div>
-
-      {result && previewUrl && selected && (
-        <GradcamPanel
-          originalUrl={previewUrl}
+        <Viewer
+          previewUrl={previewUrl}
+          sourceName={sourceName}
           disease={selected}
           overlayBase64={overlay}
-          loading={overlayLoading}
-          error={overlayError}
-          latencyMs={overlayMs}
+          overlayLoading={overlayLoading}
+          overlayError={overlayError}
+          overlayMs={overlayMs}
+          analyzing={loading}
+          disabled={loading}
+          onFile={(blob, name) => void analyze(blob, model, name)}
         />
-      )}
+
+        <Findings
+          result={result}
+          loading={loading}
+          error={error}
+          selected={selected}
+          calibrated={current?.calibrated ?? false}
+          roundTripMs={roundTripMs}
+          canCompare={models.length > 1 && !!file}
+          comparing={compareLoading}
+          onSelect={(d) => file && void loadOverlay(file, d)}
+          onCompare={() => file && void runCompare(file, selected)}
+        />
+      </main>
 
       {(comparison || compareLoading || compareError) && (
         <CompareView
@@ -207,6 +209,12 @@ export default function App() {
           error={compareError}
         />
       )}
-    </main>
+
+      <footer className="foot">
+        Research and educational demo built on NIH ChestX-ray14. Labels were extracted from
+        radiology reports by text mining; scores are not a diagnosis and the models were not
+        validated outside this dataset.
+      </footer>
+    </div>
   );
 }

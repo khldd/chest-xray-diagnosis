@@ -166,12 +166,19 @@ Browser (React) & $\rightarrow$ & nginx & $\rightarrow$ & FastAPI (ONNX Runtime;
 The served models are listed in \texttt{models/registry.json}, generated from the benchmark results: architecture, file paths, validation and test AUC, and the temperature fitted on validation. Probabilities are computed as $\sigma(z/T)$ with that temperature, and the ensemble averages the members' probabilities (and heatmaps). All four architectures pass the same ONNX parity check against PyTorch (largest relative output difference $1.7\times10^{-5}$).
 Uploads are decoded for real, not trusted by file type: non-images are rejected with a 400 and files over 10~MB with a 413. Cross-origin access is limited to configured origins.
 
-\paragraph{Frontend.} A React and TypeScript single-page app supports drag-and-drop upload, an example gallery of eight test-set X-rays, webcam capture (implemented, but not yet tested with a physical camera), probability bars, a Grad-CAM overlay selectable per disease, and a display of model metadata and latency. Stale responses are discarded so a slow heatmap cannot overwrite a newer upload. A model selector switches between the four models and the ensemble, and a comparison view runs all of them on the same image (Figure~\ref{fig:app_compare}). Agreement between architectures is more convincing than one model alone; disagreement, such as a heatmap that points elsewhere, is a reason for caution.
+\paragraph{Frontend.} A React and TypeScript single-page app is laid out like a reading-room workstation (Figure~\ref{fig:app_workstation}): a list of eight test-set studies, an image viewer that also accepts drag-and-drop uploads, and a findings panel with the calibrated probabilities of all 14 findings. Clicking a finding computes its Grad-CAM heatmap; the viewer draws the X-ray and the heatmap in the same square frame, as the model sees them, and a slider wipes between the two. A status strip shows the selected model's size, validation and test AUC and whether its scores are calibrated. Stale responses are discarded so a slow heatmap cannot overwrite a newer upload. A model switcher selects one of the four models or the ensemble, and a comparison view runs all of them on the same image (Figure~\ref{fig:app_compare}), with a summary of how many models rank the finding first and how far their scores spread. Agreement between architectures is more convincing than one model alone; disagreement, such as a heatmap that points elsewhere, is a reason for caution.
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=0.85\textwidth]{app_compare.jpg}
-\caption{Comparison view of the application, running in Docker, on a test-set X-ray labelled Cardiomegaly. All models give a high calibrated probability; three heatmaps cover the heart, while EfficientNet-B0's points at the edge of the left lung, consistent with its low Cardiomegaly localisation score (Figure~\ref{fig:localisation_disease}).}
+\includegraphics[width=\textwidth]{app_workstation.jpg}
+\caption{The application, running in Docker, on a test-set X-ray labelled Cardiomegaly with ConvNeXt-Tiny selected. Left: test-set studies; centre: the X-ray and its Grad-CAM heatmap for Cardiomegaly, split by a draggable slider; right: calibrated probabilities for the 14 findings.}
+\label{fig:app_workstation}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{app_compare.jpg}
+\caption{Comparison view on the same X-ray. All four models rank Cardiomegaly first (calibrated probabilities 81--92\%); three heatmaps cover the heart, while EfficientNet-B0's points at the edge of the left lung, consistent with its low Cardiomegaly localisation score (Figure~\ref{fig:localisation_disease}).}
 \label{fig:app_compare}
 \end{figure}
 
