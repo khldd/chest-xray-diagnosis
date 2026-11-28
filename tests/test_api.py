@@ -111,6 +111,8 @@ def test_visualize_503_when_pytorch_weights_missing():
 
 def test_predict_503_when_no_model_file(monkeypatch, tmp_path):
     monkeypatch.setattr(settings, "MODEL_ONNX", tmp_path / "missing.onnx")
+    # No registry either: models/registry.json is in git and would load local weights.
+    monkeypatch.setattr(settings, "REGISTRY", tmp_path / "missing_registry.json")
     client = TestClient(create_app())  # no stub: tries to load the real service
     assert upload(client, png_bytes()).status_code == 503
     assert client.get("/health").json()["model_file_present"] is False
