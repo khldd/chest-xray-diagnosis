@@ -7,9 +7,12 @@ data:
   batch_size: 32
   num_workers: 2
   augmentation: flip        # none | flip | strong
+  cache: false              # pre-resize all images once into a memmap (see src/data/cache.py)
+  cache_dir: /kaggle/working/cache
+  cache_workers: 4
 
 model:
-  name: densenet121
+  name: densenet121         # densenet121 | resnet50 | efficientnet_b0 | convnext_tiny
   pretrained: true
   freeze_backbone: false
 
@@ -19,3 +22,7 @@ train:
   loss: weighted_bce        # weighted_bce | bce
   output_dir: /kaggle/working
   mlflow_experiment: chest-xray
+  seed: 0                   # torch / numpy / shuffle seed (the patient split uses data.seed)
+  amp: false                # mixed precision on GPU
+  predict: false            # save val/test predictions of the best checkpoint
+  localize: false           # score Grad-CAM against the NIH expert boxes

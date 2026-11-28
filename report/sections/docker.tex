@@ -1,0 +1,29 @@
+\subsection{The role of Docker}
+\label{sec:docker}
+Docker is used to \emph{deliver} the trained models, not to train them: training needs a GPU and runs as Kaggle jobs, and its environment is pinned by the job scripts and the configuration files. What Docker solves is everything after training (Figure~\ref{fig:docker}).
+
+\begin{figure}[htbp]
+\centering\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{c c c c c}
+\fbox{\begin{minipage}{0.17\textwidth}\centering Browser\\[-0.2em]{\footnotesize React app}\end{minipage}}
+& $\xrightarrow{\ \texttt{:8080}\ }$ &
+\fbox{\begin{minipage}{0.24\textwidth}\centering \textbf{web} container\\[-0.2em]{\footnotesize nginx: static app, proxies \texttt{/api}}\\[-0.2em]{\footnotesize image 76\,MB}\end{minipage}}
+& $\xrightarrow{\ \texttt{/api}\ }$ &
+\fbox{\begin{minipage}{0.30\textwidth}\centering \textbf{api} container\\[-0.2em]{\footnotesize FastAPI, ONNX Runtime, PyTorch (Grad-CAM)}\\[-0.2em]{\footnotesize image 2.65\,GB, health-checked}\end{minipage}}\\[0.6em]
+& & & & $\uparrow$ {\footnotesize read-only volume}\\[0.2em]
+& & & &
+\fbox{\begin{minipage}{0.30\textwidth}\centering \texttt{./models} on the host\\[-0.2em]{\footnotesize \texttt{registry.json}, 4 ONNX + 4 PyTorch models (DVC)}\end{minipage}}
+\end{tabular}
+\caption{Deployment with Docker Compose. One command, \texttt{docker compose up}, builds and starts both containers.}
+\label{fig:docker}
+\end{figure}
+
+\begin{itemize}
+  \item \textbf{Reproducible environment.} The API depends on specific versions of Python, PyTorch, ONNX Runtime and the Grad-CAM library. The image freezes them, so the service behaves the same on our laptops, a grader's machine or a server, without installing anything but Docker. Before Docker, running the demo meant reproducing a Python environment with several gigabytes of packages by hand.
+  \item \textbf{Separation of concerns.} The frontend is built once into static files and served by nginx in its own small image; the model server is a separate container. nginx also proxies \texttt{/api} to the backend, so the browser talks to a single origin and needs no cross-origin exceptions. Each part can be rebuilt, restarted or scaled without touching the other.
+  \item \textbf{Code and weights are separate.} The image contains code and libraries only. The model files are mounted read-only from \texttt{./models}, where DVC places them. Changing or adding a model means editing \texttt{models/registry.json} and restarting, with no image rebuild; this is how the four benchmark models were added to the app.
+  \item \textbf{Operations.} The API image declares a health check on \texttt{/health}, so Docker reports whether the model server is actually answering; Compose restarts either container if it stops, and starts the web container after the API.
+  \item \textbf{Checked continuously.} GitHub Actions builds both images (\texttt{docker compose build}) on every change, so a broken Dockerfile is caught before it reaches anyone.
+\end{itemize}
+We verified the stack end to end with the four benchmark models: \texttt{/api/health} answers through nginx, \texttt{/api/models} lists the four models and the ensemble, and the comparison view below runs inside the containers.

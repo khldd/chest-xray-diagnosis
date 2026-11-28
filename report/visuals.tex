@@ -3,7 +3,7 @@
 \usepackage[utf8]{inputenc}
 \usepackage{lmodern}
 \usepackage[margin=1.3cm,top=1.2cm,bottom=1.2cm]{geometry}
-\usepackage{graphicx,booktabs,xcolor}
+\usepackage{graphicx,booktabs,xcolor,amsmath}
 \usepackage[colorlinks=true,linkcolor=blue!50!black]{hyperref}
 \graphicspath{{figures/}}
 \pagestyle{empty}
@@ -20,7 +20,7 @@
 \begin{document}
 \thispagestyle{empty}
 {\Huge\bfseries Chest X-ray Diagnosis}\par\vspace{0.4em}
-{\large DenseNet121, 14 thoracic diseases, NIH ChestX-ray14 \quad|\quad Hayder Methneni, Khaled Ayedi}\par\vspace{1.2em}
+{\large 14 thoracic diseases, NIH ChestX-ray14, four architectures \quad|\quad Hayder Methneni, Khaled Ayedi}\par\vspace{1.2em}
 
 {\large\bfseries Visuals (in presenting order)}\par\vspace{0.3em}
 \begin{minipage}[t]{0.48\textwidth}
@@ -43,8 +43,19 @@
   \item Grad-CAM examples
   \item The web app
 \end{enumerate}
+{\bfseries After the first review}
+\begin{enumerate}\setlength{\itemsep}{1pt}\setcounter{enumi}{13}
+  \item Same study, four architectures
+  \item Seeds: is the loss effect real?
+  \item Best model, ensemble and cost
+  \item Calibration fixed
+  \item Do the heatmaps point at the lesion?
+  \item Subgroups
+  \item Compare models in the app
+  \item The role of Docker
+\end{enumerate}
 \vspace{0.8em}
-\small Headline result: \textbf{0.799 mean AUC} on the official test set (25,596 images); validation 0.831.\par
+\small First model: \textbf{0.799} test AUC. Now: ConvNeXt-Tiny \textbf{0.809}, ensemble of four \textbf{0.816} [0.810, 0.821] (official test set, 25,596 images).\par
 Research demo, not a diagnostic tool.
 \end{minipage}
 
@@ -62,7 +73,7 @@ Research demo, not a diagnostic tool.
 {\small\color{black!65} At the validation-chosen cutoff: mean sensitivity 0.82, specificity 0.62, precision (PPV) 0.14. AUC and AP are threshold-free.}\par\vspace{1em}
 \begin{center}\small\input{tables/metrics.tex}\end{center}}{}
 
-\slideif{9. Calibration}{Over-confident: mean predicted 0.38 vs 0.076 actual positives (weighted loss inflates scores). Ranking, so AUC, is unaffected.}{calibration.png}{12.5cm}
+\slideif{9. Calibration}{Over-confident: mean predicted 0.38 vs 0.076 actual positives (weighted loss inflates scores). Ranking, so AUC, is unaffected. Explained and fixed in slide 17.}{calibration.png}{12.5cm}
 
 \newpage
 {\Large\bfseries 10. Ablation study}\par
@@ -78,7 +89,7 @@ Results not available yet.}
 
 \newpage
 {\Large\bfseries 12. Grad-CAM examples}\par
-{\small\color{black!65} Original (left) and heatmap for the labelled disease (right). Confident test cases chosen for demonstration; localisation was not measured.}\par\vspace{0.4em}
+{\small\color{black!65} Original (left) and heatmap for the labelled disease (right). Confident test cases chosen for demonstration. Localisation is measured in slide 18.}\par\vspace{0.4em}
 \begin{center}
 \includegraphics[width=0.82\textwidth]{gradcam_Cardiomegaly.png}\\[0.2em]
 \includegraphics[width=0.82\textwidth]{gradcam_Effusion.png}\\[0.2em]
@@ -93,4 +104,62 @@ Results not available yet.}
 
 \slide{13. The web app}{Pick an example or upload an X-ray: 14 probabilities, latency, Grad-CAM for any disease (screenshot).}{app_2_cardiomegaly.png}{16.2cm}
 \slide{13b. The web app, other disease selected}{Any of the 14 diseases can be selected; heatmaps show where the model looked, not a diagnosis.}{app_3_effusion.png}{16.2cm}
+
+% ---------------------------------------------------------------- after the first review
+\slide{14. Same study, four architectures}{Fine-tuning matters for every network ($-0.09$ to $-0.16$ when frozen). Weighted BCE is lower on 3 of 4 (significant); EfficientNet-B0 not significant.}{grid_heatmap.png}{14cm}
+
+\newpage
+{\Large\bfseries 15. Seeds: is the loss effect real?}\par
+{\small\color{black!65} DenseNet121 trained 3 times per loss. Every plain-BCE run beats every weighted run on test; the gap is about 4$\times$ the seed-to-seed spread.}\par\vspace{1.5em}
+\begin{center}\large\input{tables/seeds.tex}\end{center}
+\vspace{1em}
+\begin{center}\small\resizebox{0.95\textwidth}{!}{\input{tables/grid.tex}}\end{center}
+\begin{center}\small Test mean AUC [95\% patient-bootstrap CI], seed 0.\end{center}
+
+\newpage
+{\Large\bfseries 16. Best model, ensemble and cost}\par
+{\small\color{black!65} ConvNeXt-Tiny is best (0.809); its lead over DenseNet121 (0.006) is close to seed noise. The ensemble (0.816) beats every single model. EfficientNet-B0 is 6.5$\times$ faster.}\par\vspace{0.4em}
+\begin{center}
+\includegraphics[height=11.5cm,width=0.49\textwidth,keepaspectratio]{forest_auc.png}\hfill
+\includegraphics[height=11.5cm,width=0.49\textwidth,keepaspectratio]{pareto.png}
+\end{center}
+
+\slide{17. Calibration fixed}{Plain BCE is already calibrated (ECE 0.014), temperature scaling brings it to 0.007--0.013. Weighted BCE: ECE 0.33--0.36, which a temperature cannot fix (needs a bias).}{calibration_before_after.png}{15cm}
+
+\newpage
+{\Large\bfseries 18. Do the heatmaps point at the lesion?}\par
+{\small\color{black!65} 984 radiologist boxes, none in our training split. ConvNeXt-Tiny points inside the box 44\% of the time, twice the image-centre baseline. Nodules are too small for a $7\times7$ map.}\par\vspace{0.4em}
+\begin{center}
+\includegraphics[height=6.6cm,width=0.49\textwidth,keepaspectratio]{localization_bars.png}\hfill
+\begin{minipage}[b]{0.46\textwidth}\centering\small\resizebox{\textwidth}{!}{\input{tables/localization.tex}}\vspace{2em}\end{minipage}\\[0.4em]
+\includegraphics[height=6.4cm,width=0.85\textwidth,keepaspectratio]{localization_per_disease.png}
+\end{center}
+
+\slide{19. Subgroups}{No gap between men and women. Patients under 40 and bedside AP films are harder, for every architecture.}{subgroups.png}{14.5cm}
+
+\slide{20. Compare models in the app}{Same X-ray through every model and the ensemble, running in Docker. Three heatmaps cover the heart; EfficientNet-B0 looks elsewhere.}{app_compare.jpg}{15.5cm}
+
+\newpage
+{\Large\bfseries 21. The role of Docker}\par
+{\small\color{black!65} Docker delivers the trained models; it does not train them (training runs on Kaggle GPUs).}\par\vspace{2.5em}
+\begin{center}\large
+\setlength{\tabcolsep}{6pt}
+\begin{tabular}{c c c c c}
+\fbox{\begin{minipage}{0.15\textwidth}\centering Browser\\{\small React app}\end{minipage}}
+& $\xrightarrow{\ \texttt{:8080}\ }$ &
+\fbox{\begin{minipage}{0.22\textwidth}\centering \textbf{web} container\\{\small nginx: app + proxy \texttt{/api}}\\{\small 76\,MB}\end{minipage}}
+& $\xrightarrow{\ \texttt{/api}\ }$ &
+\fbox{\begin{minipage}{0.28\textwidth}\centering \textbf{api} container\\{\small FastAPI, ONNX Runtime, PyTorch}\\{\small 2.65\,GB, health-checked}\end{minipage}}\\[1em]
+& & & & $\uparrow$ {\small read-only volume}\\[0.4em]
+& & & &
+\fbox{\begin{minipage}{0.28\textwidth}\centering \texttt{./models}\\{\small registry + 4 models (DVC)}\end{minipage}}
+\end{tabular}
+\end{center}
+\vspace{2em}
+\begin{itemize}\large
+  \item \textbf{Same environment everywhere:} Python, PyTorch, ONNX Runtime versions frozen in the image.
+  \item \textbf{Two services:} static app behind nginx, model server apart; one origin for the browser.
+  \item \textbf{Weights are mounted, not baked in:} adding a model = edit \texttt{registry.json} + restart.
+  \item \textbf{One command:} \texttt{docker compose up}; CI builds both images on every change.
+\end{itemize}
 \end{document}

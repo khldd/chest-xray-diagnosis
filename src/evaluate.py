@@ -43,12 +43,13 @@ def main() -> None:
     from src.data.dataset import ChestXrayDataset
     from src.data.prepare import build_image_lookup, make_splits
     from src.data.transforms import eval_transforms
-    from src.models.densenet import build_model
+    from src.models.factory import build_model
 
     ap = argparse.ArgumentParser(description="Evaluate a checkpoint on val or test")
     ap.add_argument("--weights", required=True)
     ap.add_argument("--split", choices=["val", "test"], default="test")
     ap.add_argument("--config", default="configs/base.yaml")
+    ap.add_argument("--arch", default=None, help="override model.name from the config")
     ap.add_argument("--out", default=None, help="write metrics JSON here")
     args = ap.parse_args()
 
@@ -61,7 +62,8 @@ def main() -> None:
     ds = ChestXrayDataset(df, labels, lookup, eval_transforms(d["img_size"]))
     loader = DataLoader(ds, batch_size=d["batch_size"], num_workers=d["num_workers"])
 
-    model = build_model(pretrained=False).to(device)
+    arch = args.arch or cfg["model"]["name"]
+    model = build_model(arch, pretrained=False).to(device)
     model.load_state_dict(torch.load(args.weights, map_location=device))
     aucs, mean_auc = evaluate_auc(model, loader, device)
     result = {"split": args.split, "n_images": len(ds), "mean_auc": mean_auc, "per_class_auc": aucs}

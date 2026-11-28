@@ -1,0 +1,6 @@
+{
+  "densenet121": 18.71,
+  "resnet50": 22.31,
+  "efficientnet_b0": 5.87,
+  "convnext_tiny": 37.93
+}

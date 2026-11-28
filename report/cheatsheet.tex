@@ -13,82 +13,76 @@
 
 \begin{document}
 {\LARGE\bfseries Cheat sheet}\hfill{\small Chest X-ray Diagnosis}\par
-{\small Read once. Everything here is true and checked.}
+{\small Read once. Everything here is true and checked against results/*.csv.}
 
 \section*{The pitch (30 seconds)}
 \begin{itemize}
-  \item We detect \textbf{14 chest diseases} from an X-ray, several can be present at once.
-  \item A DenseNet121 (pretrained on ImageNet, fine-tuned) gets \textbf{0.799 AUC} on the official test set.
-  \item Grad-CAM heatmaps show where the model looked. It runs as a web app with tests and CI.
+  \item We detect \textbf{14 chest diseases} from an X-ray; several can be present at once.
+  \item We ran the \textbf{same study on four architectures} (16 training runs), tested on the official test set with confidence intervals.
+  \item Best single model ConvNeXt-Tiny \textbf{0.809 AUC}; ensemble of four \textbf{0.816}. Probabilities are now calibrated.
+  \item We \textbf{measured} the heatmaps against 984 radiologist boxes, and the app compares all models side by side, in Docker.
 \end{itemize}
 
-\section*{Numbers to remember}
-\begin{tabular}{@{}ll@{\qquad}ll@{}}
-Images & 112,120 (30,805 patients) & Val AUC & \textbf{0.831} \\
-Train / val / test & 73,916 / 12,608 / 25,596 & Test AUC & \textbf{0.799} \\
-Model size & 7.0\,M parameters & Best / worst class & Hernia 0.93 / Pneumonia 0.69 \\
-Training & 15 epochs, Adam, lr $10^{-4}$ & Speed & 25\,ms per image (CPU) \\
+\section*{The professor's two questions}
+\textbf{``Why didn't you train other models and do the same to them?''} We did. DenseNet121, ResNet50, EfficientNet-B0, ConvNeXt-Tiny, each in three variants (plain BCE, weighted BCE, frozen backbone), same split, same 5-epoch recipe, plus 3 seeds for DenseNet. The ablation conclusions now hold across architectures, not just one network.
+
+\textbf{``What is the role of Docker?''} Docker \emph{delivers} the trained models; it does not train them (training needs GPUs, it runs on Kaggle). Two containers: \textbf{web} (nginx serves the React app and forwards \texttt{/api}) and \textbf{api} (FastAPI + ONNX Runtime + PyTorch for Grad-CAM). Why: (1) the same Python/PyTorch/ONNX versions on any machine; (2) app and model server are separate, one origin for the browser; (3) weights are \emph{mounted} read-only from \texttt{./models}, not baked into the image: adding a model is editing \texttt{registry.json} and restarting; (4) one command, \texttt{docker compose up}, and CI builds the images on every change. Images: api 2.65\,GB, web 76\,MB.
+
+\section*{Numbers to remember (official test set, 25,596 images)}
+\begin{tabular}{@{}lccc@{}}
+\toprule
+Model & Test AUC [95\% CI] & Params & CPU ms \\
+\midrule
+ConvNeXt-Tiny & \textbf{0.809} [0.802, 0.814] & 27.8M & 37.9 \\
+DenseNet121 & 0.803 [0.796, 0.808] & 7.0M & 18.7 \\
+ResNet50 & 0.798 [0.791, 0.804] & 23.5M & 22.3 \\
+EfficientNet-B0 & 0.789 [0.782, 0.795] & 4.0M & 5.9 \\
+Ensemble of the four & \textbf{0.816} [0.810, 0.821] & -- & $\approx$85 \\
+\midrule
+First model (DenseNet, weighted, 15 ep.) & 0.799 & 7.0M & \\
+\bottomrule
 \end{tabular}
 
-\section*{What is ours, honestly}
+\section*{The findings, in one line each}
 \begin{itemize}
-  \item The \textbf{model was trained by the team} in the notebook (15 epochs). We did not invent a new architecture.
-  \item We added: a reproducible, tested pipeline, honest test evaluation, Grad-CAM, ONNX, the API, the UI, Docker, CI, DVC, and the report.
-  \item The \textbf{ablations} are new training runs (5 epochs each) on Kaggle.
+  \item \textbf{Fine-tuning is essential} for all four: frozen backbone loses 0.09 to 0.16 AUC.
+  \item \textbf{Class weighting does not help}: lower on 3 of 4 architectures (significant), EfficientNet not significant. With 3 seeds, every plain run beats every weighted run; gap 0.009 $\approx$ 4$\times$ the seed noise (sd 0.002).
+  \item \textbf{Weighting caused the over-confidence}: weighted models ECE 0.33--0.36; plain models 0.014, and 0.007--0.013 after temperature scaling. A temperature cannot fix the weighted models (their scores are shifted, not stretched); a bias term can.
+  \item \textbf{Heatmaps measured}: peak inside the radiologist's box ConvNeXt 44\%, ResNet 34\%, EfficientNet 26\%, DenseNet 25\%. Baselines: random point 8\%, image centre 22\%. Cardiomegaly 80--99\% (except EfficientNet 40\%), nodules almost never (too small).
+  \item \textbf{Subgroups}: no gap men vs women; patients under 40 and AP (bedside) films are harder for every model.
 \end{itemize}
 
 \section*{Questions you will get}
-\textbf{Why split by patient?} One patient has up to 184 images. A random split puts the same person in train and validation, so the model recognises the person instead of the disease and the score is inflated.
+\textbf{Why split by patient?} One patient has up to 184 images. A random split puts the same person in train and validation, so the model recognises the person and the score is inflated.
 
-\textbf{Why AUC and not accuracy?} Rare diseases (Hernia 0.15\%): predicting ``healthy'' always is 99\% accurate and useless. AUC measures how well the model ranks sick above healthy.
+\textbf{Why AUC and not accuracy?} Hernia is 0.15\% of images: always saying ``healthy'' is 99.8\% accurate and useless. AUC measures how well sick cases are ranked above healthy ones.
 
-\textbf{Why weighted loss?} The idea: rare diseases would be ignored, so each positive counts $N_{neg}/N_{pos}$ times (5 to 653). \textbf{But our ablation showed it did not help AUC} (plain loss 0.836 vs weighted 0.823, better in 13 of 14 classes) and it makes scores over-confident. Say this openly: it is a real finding.
+\textbf{What does the confidence interval mean?} We resample \emph{patients} of the test set 1,000 times and recompute the AUC; 95\% of the values fall in the interval. Paired test: same resamples for two models, look at the difference.
 
-\textbf{What is an ablation?} Retrain with one choice removed and compare, to measure what that choice is worth.
+\textbf{So ConvNeXt is better than DenseNet?} Likely, not proven: +0.006, but DenseNet's own seeds vary from 0.803 to 0.807 and we have one ConvNeXt seed. The ensemble's gain (+0.007 over ConvNeXt) is more solid, and ConvNeXt vs EfficientNet (+0.020) is clear.
 
-\textbf{Overfitting?} Test gap is small (0.831 vs 0.799, best epoch picked on validation). In the 5-epoch reference run, validation loss rises after epoch 2--3 while training loss keeps falling, and AUC peaks at epoch 4: overfitting starts early. We have no curve for the 15-epoch run.
+\textbf{What is temperature scaling?} Divide the logits by one number $T$ fitted on validation. It changes the confidence, not the ranking, so AUC is identical.
 
-\textbf{Is 0.799 good?} Reasonable for plain DenseNet121 at 224\,px. Published results are a bit higher. Next steps: higher resolution, stronger backbone.
+\textbf{How do you score a heatmap?} Pointing game: is the hottest pixel inside the box drawn by a radiologist? Compare with a random point and with the image centre, which already gets 22\% because many findings are central.
 
-\textbf{Why is Pneumonia weak?} Diffuse and ambiguous on a frontal film; labels were machine-extracted from reports (noisy).
-
-\textbf{Usable clinically?} No. Noisy labels, one dataset, no external validation, one run, no calibration.
-
-\section*{Ablation results (5 epochs each, validation AUC)}
-\begin{tabular}{@{}lr@{\quad}l@{}}
-Fine-tuned, weighted loss (reference) & 0.823 & our recipe \\
-Frozen backbone, last layer only & 0.734 & fine-tuning is essential (+0.09) \\
-Fine-tuned, plain loss & \textbf{0.836} & better than our weighted loss \\
-\end{tabular}
-\begin{itemize}
-  \item \textbf{Fine-tuning matters a lot.} Frozen still improves but is far behind.
-  \item \textbf{Weighting did not help} (+0.013 for plain loss, every epoch, 13/14 classes). One seed, so suggestive, not proven. A 5-epoch plain-loss run already beats the 15-epoch main model's validation AUC (0.836 vs 0.831); not tested on the test set.
-  \item Strong augmentation was configured but dropped to save GPU time: no claim about it.
-\end{itemize}
-
-\section*{Honest weak spots (we measured them)}
-\begin{itemize}
-  \item \textbf{Precision is low.} At a cutoff that catches 82\% of sick cases (mean sensitivity), specificity is 0.62 and precision only 0.14 on average. Good at ranking, noisy as a yes/no alarm.
-  \item \textbf{Scores are not probabilities.} Mean predicted 0.38 vs 0.076 real positives: the weighted loss makes the model over-confident. The app's ``99.9\%'' means ``scores very high'', not ``99.9\% sure''.
-  \item Hernia has the best AUC (0.93) but only 0.3\% prevalence in test, so precision is tiny.
-\end{itemize}
+\textbf{Usable clinically?} No. Labels are machine-extracted from reports, one hospital, no external validation.
 
 \section*{Do not say}
-\begin{tabular}{@{}p{0.46\textwidth}p{0.48\textwidth}@{}}
+\begin{tabular}{@{}p{0.44\textwidth}p{0.50\textwidth}@{}}
 \toprule
 Don't say & Say instead \\
 \midrule
-``It diagnoses diseases'' & ``Research demo; it ranks likelihoods, not a diagnosis'' \\
-``99.9\% sure'' & ``It scores very high; scores are not calibrated'' \\
-``Grad-CAM proves it looks at the right place'' & ``Plausibility check; localisation was not measured'' \\
-``We built the model'' & ``The team trained it; we built the pipeline around it'' \\
+``It diagnoses diseases'' & ``Research demo; it estimates probabilities, not a diagnosis'' \\
+``ConvNeXt is significantly the best'' & ``Best on the test set; its lead over DenseNet is close to seed noise'' \\
+``Grad-CAM proves it looks at the right place'' & ``ConvNeXt points into the expert box 44\% of the time, twice the centre baseline; others barely beat it'' \\
+``Docker trains the model'' & ``Docker serves it; training is on Kaggle GPUs'' \\
 ``The webcam works'' & ``Implemented; not yet tested on a real camera'' (until you test it) \\
 \bottomrule
 \end{tabular}
 
-\section*{Demo (2 minutes)}
-Open the app $\to$ click the Cardiomegaly example $\to$ read bars and latency $\to$ click Cardiomegaly for the heatmap $\to$ show Hernia is low (it does not flag everything). Say the gallery images are confident test cases.
+\section*{Demo (3 minutes)}
+\texttt{docker compose up}, open \texttt{localhost:8080} $\to$ point at the model pills (test AUC on each) $\to$ click the Cardiomegaly example $\to$ read the calibrated probabilities $\to$ click \emph{Compare all models}: four heatmaps + ensemble; note EfficientNet looks elsewhere, which matches its localisation score $\to$ switch to \emph{Ensemble}.
 
 \vfill
-{\footnotesize Repo: github.com/khldd/chest-xray-diagnosis \quad|\quad Full report: report/main.pdf \quad|\quad Visuals: report/visuals.pdf}
+{\footnotesize Repo: github.com/khldd/chest-xray-diagnosis \quad|\quad Report: report/main.pdf \quad|\quad Visuals: report/visuals.pdf}
 \end{document}
