@@ -237,14 +237,25 @@ def prep_auc(p: np.ndarray, y: np.ndarray) -> list:
     return prep
 
 
-def mean_auc_weighted(prep: list, w: np.ndarray | None = None) -> float:
+def mean_auc_weighted(prep: list, w: np.ndarray | None = None,
+                      classes: list[int] | None = None) -> float:
+    """Mean AUC over `classes` (default: every class with both positives and negatives).
+
+    With explicit `classes` (the bootstrap), a resample in which one of them has no positive
+    or no negative returns NaN and is dropped, instead of silently averaging fewer classes:
+    that would mix different class sets and bias the interval (seen in small subgroups).
+    """
     aucs = []
-    for order, g, ng, ys in prep:
+    for i, (order, g, ng, ys) in enumerate(prep):
+        if classes is not None and i not in classes:
+            continue
         ws = np.ones(len(order)) if w is None else w[order]
         pos = np.bincount(g, ws * ys, ng)
         neg = np.bincount(g, ws * (1 - ys), ng)
         n_pos, n_neg = pos.sum(), neg.sum()
         if n_pos == 0 or n_neg == 0:
+            if classes is not None:
+                return float("nan")
             continue
         below = np.cumsum(neg) - neg  # negatives strictly below each score group
         aucs.append(float((pos * (below + 0.5 * neg)).sum() / (n_pos * n_neg)))
@@ -257,10 +268,12 @@ def patient_bootstrap(preps: dict[str, list], patients: np.ndarray, n_boot: int,
     n_pat = int(inv.max()) + 1
     rng = np.random.default_rng(seed)
     out = {k: np.empty(n_boot) for k in preps}
+    valid = {k: [i for i, (_, _, _, ys) in enumerate(prep) if 0 < ys.sum() < len(ys)]
+             for k, prep in preps.items()}
     for b in range(n_boot):
         w = np.bincount(rng.integers(0, n_pat, n_pat), minlength=n_pat)[inv].astype(np.float64)
         for k, prep in preps.items():
-            out[k][b] = mean_auc_weighted(prep, w)
+            out[k][b] = mean_auc_weighted(prep, w, valid[k])
     return out
 
 
@@ -304,6 +317,17 @@ def analyze_subgroups(probs: dict[str, np.ndarray], meta: dict, n_boot: int, see
 
 
 # --------------------------------------------------------------------------- outputs
+# One fixed colour per architecture, the same as scripts/collect_benchmark.py.
+ARCH_COLORS = {"convnext_tiny": "#2a78d6", "densenet121": "#eb6834",
+               "resnet50": "#1baf7a", "efficientnet_b0": "#eda100"}
+
+
+def _series_color(name: str, fallback) -> str:
+    if name == ENSEMBLE:
+        return "#52514e"
+    return next((c for a, c in ARCH_COLORS.items() if name.startswith(a)), fallback)
+
+
 def _color(name: str) -> str:
     return RED if name == ENSEMBLE else BLUE
 
@@ -365,8 +389,8 @@ def plot_subgroups(rows: list[dict], models: list[str], path: Path) -> None:
                 ys.append(r["auc"])
                 lo.append(r["auc"] - r["ci_low"])
                 hi.append(r["ci_high"] - r["auc"])
-        ax.errorbar(xs, ys, yerr=[lo, hi], fmt="o", capsize=3, ms=4, label=m,
-                    color=RED if m == ENSEMBLE else cmap(j))
+        ax.errorbar(xs, ys, yerr=[lo, hi], fmt="D" if m == ENSEMBLE else "o", capsize=3,
+                    ms=4, label=m, color=_series_color(m, cmap(j)))
     ax.set_xticks(range(len(levels)), [f"{g}\n{lv}" for g, lv in levels], fontsize=8)
     ax.set(ylabel="Mean test AUC (95% CI)", title="Subgroup performance (test set)")
     ax.legend(frameon=False, fontsize=8)

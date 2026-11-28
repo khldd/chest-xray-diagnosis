@@ -32,10 +32,14 @@ def export(
     with torch.no_grad():
         expected = model(x).numpy()
     got = sess.run(None, {"image": x.numpy()})[0]
-    max_diff = float(np.abs(expected - got).max())
+    # Relative to the logit's size: random noise is far outside the training data, and some
+    # trained models answer it with logits of -1e4 or more, where float32 rounding alone
+    # exceeds an absolute 1e-3 (EfficientNet-B0: 0.02 on -5.6e4). Normal logits are within a
+    # few units, so this is the plain absolute check there.
+    max_diff = float((np.abs(expected - got) / np.maximum(1.0, np.abs(expected))).max())
     if max_diff > tol:
-        raise RuntimeError(f"ONNX parity failed: max abs diff {max_diff:.2e} > {tol}")
-    print(f"Exported {out} (max abs diff vs PyTorch: {max_diff:.2e})")
+        raise RuntimeError(f"ONNX parity failed: max relative diff {max_diff:.2e} > {tol}")
+    print(f"Exported {out} (max relative diff vs PyTorch: {max_diff:.2e})")
     return max_diff
 
 

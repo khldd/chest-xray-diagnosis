@@ -347,10 +347,10 @@ h2 {
 
 .compare-card {
   margin: 0;
-  border: 1px solid #e3e8ef;
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 0.5rem;
-  background: #fff;
+  background: var(--bg);
 }
 
 .compare-card img {
@@ -366,6 +366,11 @@ h2 {
   margin-top: 0.4rem;
 }
 
+.compare-card strong {
+  color: var(--text);
+}
+
 .compare-card .score {
+  color: var(--accent);
   font-variant-numeric: tabular-nums;
 }

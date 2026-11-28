@@ -134,3 +134,27 @@ def test_ece_perfect_and_bad():
     y = np.array([[0], [1]] * 50)
     assert am.ece(y.astype(float), y) == 0.0
     assert am.ece(1.0 - y.astype(float), y) == pytest.approx(1.0)
+
+
+def test_bootstrap_keeps_the_same_classes_in_every_resample():
+    """A rare class with one positive patient must not be dropped from some resamples only.
+
+    Class 0 is easy (AUC 1), class 1 is pure noise and has a single positive patient. Dropping
+    class 1 whenever that patient is not drawn would push those resamples' mean up to 1 and
+    leave the point estimate at the bottom of its own interval.
+    """
+    rng = np.random.default_rng(0)
+    n = 400
+    y = np.zeros((n, 2))
+    y[: n // 2, 0] = 1
+    y[0, 1] = 1  # the only positive of class 1
+    p = np.column_stack([y[:, 0] * 0.8 + 0.1, rng.random(n)])
+    patients = np.arange(n)
+    prep = am.prep_auc(p, y)
+    point = am.mean_auc_weighted(prep)
+    boots = am.patient_bootstrap({"m": prep}, patients, 300, seed=0)["m"]
+    finite = boots[np.isfinite(boots)]
+    assert len(finite) < len(boots)  # resamples without that patient are discarded
+    assert np.all(finite < 1.0)  # ... and never averaged over class 0 alone
+    lo, hi = am.ci(boots)
+    assert lo <= point <= hi
