@@ -22,9 +22,12 @@ def gradcam_heatmaps(
 ) -> np.ndarray:
     """Grad-CAM for a batch: images [B,3,H,W], one class per image -> [B,H,W] in 0..1."""
     device = next(model.parameters()).device
+    # With a frozen backbone no parameter before the target layer needs a gradient, so autograd
+    # would never reach that layer. Asking for the input's gradient keeps the whole path alive.
+    images = images.detach().to(device).requires_grad_(True)
     with GradCAM(model=model, target_layers=[cam_target_layer(model, arch)]) as cam:
         return cam(
-            input_tensor=images.to(device),
+            input_tensor=images,
             targets=[ClassifierOutputTarget(i) for i in class_indices],
         )
 

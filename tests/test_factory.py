@@ -26,12 +26,14 @@ def test_freeze_leaves_only_the_head(name):
     assert n_trainable < count_parameters(model) / 100
 
 
+@pytest.mark.parametrize("frozen", [False, True])
 @pytest.mark.parametrize("name", NAMES)
-def test_gradcam_layer_gives_a_heatmap(name):
+def test_gradcam_layer_gives_a_heatmap(name, frozen):
     pytest.importorskip("pytorch_grad_cam")
     from src.gradcam import gradcam_heatmaps
 
-    model = build_model(name, pretrained=False).eval()
+    # frozen=True: no backbone parameter needs a gradient (this crashed the frozen runs).
+    model = build_model(name, pretrained=False, freeze_backbone=frozen).eval()
     heat = gradcam_heatmaps(model, torch.randn(2, 3, 224, 224), [0, 5], name)
     assert heat.shape == (2, 224, 224)
     assert np.isfinite(heat).all() and heat.min() >= 0
