@@ -1,0 +1,10 @@
+\begin{tabular}{lccc}
+\toprule
+Architecture & Fine-tuned, plain BCE & Fine-tuned, weighted BCE & Frozen backbone, plain BCE \\
+\midrule
+DenseNet121 & 0.803 [0.796, 0.808] & 0.798 [0.791, 0.803] & 0.683 [0.675, 0.691] \\
+ResNet50 & 0.798 [0.791, 0.804] & 0.792 [0.785, 0.798] & 0.664 [0.655, 0.672] \\
+EfficientNet-B0 & 0.789 [0.782, 0.795] & 0.792 [0.785, 0.798] & 0.631 [0.623, 0.639] \\
+ConvNeXt-Tiny & \textbf{0.809 [0.802, 0.814]} & \textbf{0.801 [0.793, 0.808]} & \textbf{0.721 [0.713, 0.728]} \\
+\bottomrule
+\end{tabular}

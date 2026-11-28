@@ -52,8 +52,7 @@ We use the NIH ChestX-ray14 dataset~\cite{wang2017chestxray}: 112{,}120 frontal 
 
 \paragraph{Model.} We use DenseNet121~\cite{huang2017densenet} pretrained on ImageNet and replace the 1000-way classifier with a linear layer from 1024 features to 14 outputs. All 6.97 million parameters are fine-tuned. Each output is passed through a sigmoid at inference time, giving an independent probability per disease.
 
-\paragraph{Loss.} Training uses binary cross-entropy with logits and a per-class positive weight $w_c = N^{-}_c / N^{+}_c$ computed on the training split (Table~\ref{tab:classes}), which ranges from 5.2 for Infiltration to 653 for Hernia. The motivation is that a model can reach a low loss by predicting ``absent'' for rare findings; Section~
-ef{sec:ablations} tests whether this weighting actually helps.
+\paragraph{Loss.} Training uses binary cross-entropy with logits and a per-class positive weight $w_c = N^{-}_c / N^{+}_c$ computed on the training split (Table~\ref{tab:classes}), which ranges from 5.2 for Infiltration to 653 for Hernia. The motivation is that a model can reach a low loss by predicting ``absent'' for rare findings; Section~\ref{sec:ablations} tests whether this weighting actually helps.
 
 \paragraph{Optimisation.} Adam with learning rate $10^{-4}$, batch size 32, up to 15 epochs on a Kaggle T4 GPU. After every epoch the mean validation AUC is computed and the checkpoint with the best value is kept. The final pipeline writes the full training state (weights, optimiser, epoch, history) so a run can be resumed, and logs to MLflow.
 
