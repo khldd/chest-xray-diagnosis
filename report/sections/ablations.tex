@@ -1,14 +1,14 @@
 \IfFileExists{tables/ablations.tex}{%
   To measure what each design choice contributes, we compare variants of the main setup under an identical budget (same data split, optimiser and number of epochs). Table~\ref{tab:ablations} and Figure~\ref{fig:ablation_curves} report the validation mean AUC; the test set is not used for these comparisons.
 
-  \begin{table}[ht]
+  \begin{table}[htbp]
   \centering
   \input{tables/ablations.tex}
   \caption{Ablation runs. ``Best epoch'' is the epoch with the highest validation mean AUC.}
   \label{tab:ablations}
   \end{table}
 
-  \begin{figure}[ht]
+  \begin{figure}[htbp]
   \centering
   \IfFileExists{figures/ablation_curves.png}{\includegraphics[width=0.75\textwidth]{ablation_curves.png}}{}
   \caption{Validation mean AUC per epoch for each ablation run.}

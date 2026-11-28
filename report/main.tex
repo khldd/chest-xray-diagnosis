@@ -9,6 +9,8 @@
 \usepackage{booktabs}
 \usepackage{caption}
 \usepackage{microtype}
+\usepackage[section]{placeins}
+\renewcommand{\topfraction}{0.85}\renewcommand{\textfraction}{0.1}\renewcommand{\floatpagefraction}{0.75}
 \usepackage{xcolor}
 \usepackage[colorlinks=true,linkcolor=blue!50!black,urlcolor=blue!50!black,citecolor=blue!50!black]{hyperref}
 
@@ -61,7 +63,7 @@ We use the NIH ChestX-ray14 dataset~\cite{wang2017chestxray}: 112{,}120 frontal 
 
 \paragraph{Labels and imbalance.} Each image gets a 14-dimensional multi-hot vector; ``No Finding'' is the all-zero vector. The classes are strongly imbalanced (Table~\ref{tab:classes}): Infiltration is present in 16.0\% of training images, while Hernia is present in only 0.15\% (113 images).
 
-\begin{table}[ht]
+\begin{table}[htbp]
 \centering
 \input{tables/classes.tex}
 \caption{Per-class training prevalence, loss weight and test AUC. The loss weight is the ratio of negatives to positives in the training split.}
@@ -85,7 +87,7 @@ We use the NIH ChestX-ray14 dataset~\cite{wang2017chestxray}: 112{,}120 frontal 
 \subsection{Main model}
 The selected checkpoint reaches a mean AUC of \textbf{0.831} on the validation split and \textbf{0.7987} on the official test split. Table~\ref{tab:classes} lists the per-class test AUCs and Figure~\ref{fig:auc} plots them. Hernia (0.933), Emphysema (0.909) and Cardiomegaly (0.871) are the best-detected findings; Pneumonia (0.688) and Infiltration (0.693) are the weakest.
 
-\begin{figure}[ht]
+\begin{figure}[htbp]
 \centering
 \includegraphics[width=0.82\textwidth]{test_auc_per_class.png}
 \caption{Per-class AUC of the final model on the official test set (25{,}596 images).}
@@ -98,21 +100,21 @@ The gap between validation and test is expected and we do not hide it. The best 
 \label{sec:calibration}
 AUC does not say how the model behaves as a yes/no detector. We therefore choose one cutoff per class on the validation set (maximising sensitivity plus specificity) and apply it unchanged to the test set (Table~\ref{tab:metrics}, Figure~\ref{fig:confusion}). At these cutoffs the mean sensitivity is 0.82 but the mean specificity is 0.62 and the mean precision only 0.14: the model ranks cases well but, because most findings are rare, it produces many false alarms. Average precision (mean 0.27) is far below the AUC (0.80) for the same reason; Pneumonia (AP 0.05) and Fibrosis (AP 0.09) are the extreme cases.
 
-\begin{table}[ht]
+\begin{table}[htbp]
 \centering\small
 \input{tables/metrics.tex}
 \caption{Test-set metrics per class at the validation-chosen cutoff. AUC and AP (average precision) do not depend on the cutoff.}
 \label{tab:metrics}
 \end{table}
 
-\begin{figure}[ht]
+\begin{figure}[htbp]
 \centering
 \includegraphics[width=0.95\textwidth]{confusion_matrices.png}
 \caption{Per-class confusion matrices on the test set (cell values are counts and row percentages).}
 \label{fig:confusion}
 \end{figure}
 
-\begin{figure}[ht]
+\begin{figure}[htbp]
 \centering
 \includegraphics[width=0.88\textwidth]{calibration.png}
 \caption{Reliability diagram and score distribution on the test set. Scores are far above the observed frequency: the mean predicted score is 0.38 while 7.6\% of labels are positive.}
@@ -128,7 +130,7 @@ The scores of this first model are strongly over-confident (Figure~\ref{fig:cali
 \subsection{Qualitative analysis with Grad-CAM}
 Figure~\ref{fig:gradcam} shows heatmaps for two correctly detected test images. For Cardiomegaly the activation is concentrated on the cardiac silhouette; for Effusion it covers the lower lung zone, where fluid collects. This agrees with where a radiologist would look.
 
-\begin{figure}[ht]
+\begin{figure}[htbp]
 \centering
 \includegraphics[width=0.9\textwidth]{gradcam_Cardiomegaly.png}\\[0.5em]
 \includegraphics[width=0.9\textwidth]{gradcam_Effusion.png}
@@ -143,7 +145,7 @@ These examples are \emph{confident} cases chosen for demonstration (probabilitie
 \section{System}
 The models are delivered as a small web application (Figure~\ref{fig:arch}).
 
-\begin{figure}[ht]
+\begin{figure}[htbp]
 \centering
 \small
 \begin{tabular}{@{}c@{\ \ }c@{\ \ }c@{\ \ }c@{\ \ }c@{}}
@@ -166,7 +168,7 @@ Uploads are decoded for real, not trusted by file type: non-images are rejected 
 
 \paragraph{Frontend.} A React and TypeScript single-page app supports drag-and-drop upload, an example gallery of eight test-set X-rays, webcam capture (implemented, but not yet tested with a physical camera), probability bars, a Grad-CAM overlay selectable per disease, and a display of model metadata and latency. Stale responses are discarded so a slow heatmap cannot overwrite a newer upload. A model selector switches between the four models and the ensemble, and a comparison view runs all of them on the same image (Figure~\ref{fig:app_compare}). Agreement between architectures is more convincing than one model alone; disagreement, such as a heatmap that points elsewhere, is a reason for caution.
 
-\begin{figure}[ht]
+\begin{figure}[htbp]
 \centering
 \includegraphics[width=0.85\textwidth]{app_compare.jpg}
 \caption{Comparison view of the application, running in Docker, on a test-set X-ray labelled Cardiomegaly. All models give a high calibrated probability; three heatmaps cover the heart, while EfficientNet-B0's points at the edge of the left lung, consistent with its low Cardiomegaly localisation score (Figure~\ref{fig:localisation_disease}).}

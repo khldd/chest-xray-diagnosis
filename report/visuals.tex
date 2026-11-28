@@ -131,7 +131,7 @@ Results not available yet.}
 {\small\color{black!65} 984 radiologist boxes, none in our training split. ConvNeXt-Tiny points inside the box 44\% of the time, twice the image-centre baseline. Nodules are too small for a $7\times7$ map.}\par\vspace{0.4em}
 \begin{center}
 \includegraphics[height=6.6cm,width=0.49\textwidth,keepaspectratio]{localization_bars.png}\hfill
-\begin{minipage}[b]{0.46\textwidth}\centering\small\input{tables/localization.tex}\vspace{2em}\end{minipage}\[0.4em]
+\begin{minipage}[b]{0.46\textwidth}\centering\small\resizebox{\textwidth}{!}{\input{tables/localization.tex}}\vspace{2em}\end{minipage}\\[0.4em]
 \includegraphics[height=6.4cm,width=0.85\textwidth,keepaspectratio]{localization_per_disease.png}
 \end{center}
 
@@ -145,14 +145,14 @@ Results not available yet.}
 \begin{center}\large
 \setlength{\tabcolsep}{6pt}
 \begin{tabular}{c c c c c}
-\fbox{\begin{minipage}{0.15\textwidth}\centering Browser\{\small React app}\end{minipage}}
+\fbox{\begin{minipage}{0.15\textwidth}\centering Browser\\{\small React app}\end{minipage}}
 & $\xrightarrow{\ \texttt{:8080}\ }$ &
-\fbox{\begin{minipage}{0.22\textwidth}\centering \textbf{web} container\{\small nginx: app + proxy \texttt{/api}}\{\small 76\,MB}\end{minipage}}
+\fbox{\begin{minipage}{0.22\textwidth}\centering \textbf{web} container\\{\small nginx: app + proxy \texttt{/api}}\\{\small 76\,MB}\end{minipage}}
 & $\xrightarrow{\ \texttt{/api}\ }$ &
-\fbox{\begin{minipage}{0.28\textwidth}\centering \textbf{api} container\{\small FastAPI, ONNX Runtime, PyTorch}\{\small 2.65\,GB, health-checked}\end{minipage}}\[1em]
-& & & & $\uparrow$ {\small read-only volume}\[0.4em]
+\fbox{\begin{minipage}{0.28\textwidth}\centering \textbf{api} container\\{\small FastAPI, ONNX Runtime, PyTorch}\\{\small 2.65\,GB, health-checked}\end{minipage}}\\[1em]
+& & & & $\uparrow$ {\small read-only volume}\\[0.4em]
 & & & &
-\fbox{\begin{minipage}{0.28\textwidth}\centering \texttt{./models}\{\small registry + 4 models (DVC)}\end{minipage}}
+\fbox{\begin{minipage}{0.28\textwidth}\centering \texttt{./models}\\{\small registry + 4 models (DVC)}\end{minipage}}
 \end{tabular}
 \end{center}
 \vspace{2em}
