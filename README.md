@@ -29,7 +29,7 @@ Prototype: [`notebooks/chest-xray-diagnosis.ipynb`](notebooks/chest-xray-diagnos
 
 ## Model weights
 
-Weights are versioned with [DVC](https://dvc.org/): git only holds `models/best_model.pth.dvc`. The DVC remote is on DagsHub (`https://dagshub.com/khldd/chest-xray-diagnosis.dvc`), so after cloning:
+Weights are versioned with [DVC](https://dvc.org/): git only holds `models/best_model.pth.dvc` (the original DenseNet) and `models/bench.dvc` (the four benchmark models served by the app, ONNX + PyTorch, ~500 MB). The DVC remote is on DagsHub (`https://dagshub.com/khldd/chest-xray-diagnosis.dvc`), so after cloning:
 
 ```bash
 pip install dvc
@@ -116,6 +116,6 @@ Following the course milestones:
 - [x] Test-set evaluation
 - [x] Ablations: frozen backbone vs fine-tuning vs plain BCE (5 epochs, see `results/ablations.csv`); strong augmentation not run
 - [x] FastAPI backend (`/health`, `/model/metadata`, `/predict`, `/predict/visualize`) with ONNX Runtime
-- [x] React frontend (upload, example gallery, webcam, probability bars, Grad-CAM overlay, latency)
+- [x] React frontend (upload, example gallery, probability bars, Grad-CAM overlay, latency)
 - [x] Docker Compose, GitHub Actions (lint, pytest, docker build)
 - [x] LaTeX technical report (`report/main.pdf`), figures album (`report/visuals.pdf`) and cheat sheet (`report/cheatsheet.pdf`); build with `tectonic report/main.tex` from `report/`

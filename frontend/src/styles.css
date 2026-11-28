@@ -259,20 +259,6 @@ h2 {
   margin: 12px 0 0;
 }
 
-.webcam {
-  margin-top: 12px;
-}
-
-.webcam video {
-  display: block;
-  width: 100%;
-  margin-bottom: 8px;
-}
-
-.row {
-  display: flex;
-  gap: 8px;
-}
 
 .btn {
   padding: 8px 14px;
