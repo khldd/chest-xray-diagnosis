@@ -5,6 +5,7 @@
 \usepackage{lmodern}
 \usepackage[margin=2.4cm]{geometry}
 \usepackage{graphicx}
+\usepackage{amsmath}
 \usepackage{booktabs}
 \usepackage{caption}
 \usepackage{microtype}
@@ -17,7 +18,7 @@
 \setlength{\parindent}{0pt}
 
 \title{Multi-label Diagnosis of 14 Thoracic Diseases from Chest X-rays\\
-\large DenseNet121 transfer learning with Grad-CAM explanations and a deployed demo}
+\large Four architectures compared, explanations measured against radiologists' boxes,\\ calibrated probabilities and a containerised demo}
 \author{Hayder Methneni \and Khaled Ayedi}
 \date{Deep Learning Avanc\'e --- TEK-UP, ING-5, 2026--2027\\ (also submitted for Big Data)}
 
@@ -25,13 +26,33 @@
 \maketitle
 
 \begin{abstract}
-We train a DenseNet121 initialised from ImageNet to detect 14 thoracic diseases, each independently, from frontal chest X-rays of the NIH ChestX-ray14 dataset. A weighted binary cross-entropy loss is used against severe class imbalance (an ablation shows it did not improve AUC), and validation is done on a patient-wise split to avoid leakage. The model reaches a mean AUC of 0.831 on validation and \textbf{0.799 on the official test set} of 25{,}596 images. Grad-CAM heatmaps show which image regions drive each prediction. The model is exported to ONNX and served through a FastAPI backend with a React frontend, packaged with Docker Compose and checked by continuous integration. This is a research and educational demo, not a diagnostic tool.
+We detect 14 thoracic diseases, each independently, from frontal chest X-rays of the NIH ChestX-ray14 dataset, using a patient-wise split to avoid leakage. Our first model, a DenseNet121 trained with a class-weighted loss, reaches a mean AUC of 0.799 on the official test set of 25{,}596 images. We then repeated our ablation study on four architectures (DenseNet121, ResNet50, EfficientNet-B0, ConvNeXt-Tiny; 16 training runs) and evaluated every run on the test set with patient-level bootstrap confidence intervals and paired tests. Three findings hold across architectures:
+\begin{itemize}
+  \item fine-tuning the backbone is essential;
+  \item class weighting does not improve AUC (worse on three of four architectures, a gap four times the seed-to-seed noise) and is the cause of the over-confident scores;
+  \item the same subgroups are harder for every architecture (patients under 40 and bedside AP films), while there is no gap between men and women.
+\end{itemize}
+ConvNeXt-Tiny is the best single model (\textbf{test AUC 0.809}), and an ensemble of the four reaches \textbf{0.816} [0.810, 0.821]. With plain cross-entropy and temperature scaling the outputs are calibrated probabilities (test ECE below 0.013). We also measured Grad-CAM against 984 bounding boxes drawn by radiologists: ConvNeXt-Tiny's heatmap peak falls inside the box 44\% of the time, against 22\% for a point always at the image centre, while two architectures barely beat that baseline. The four models are served side by side through ONNX Runtime, FastAPI and React, packaged with Docker Compose and checked by continuous integration. This is a research and educational demo, not a diagnostic tool.
 \end{abstract}
+
+\begin{center}
+\fbox{\begin{minipage}{0.93\textwidth}
+\textbf{What changed since the first review.}
+\begin{itemize}\setlength{\itemsep}{1pt}
+  \item \emph{``Why not train other models and run the same study on them?''} We did: four architectures $\times$ three variants, plus repeated seeds (Section~\ref{sec:benchmark}).
+  \item Every model is now evaluated on the test set with confidence intervals and paired significance tests, instead of single validation numbers.
+  \item The over-confidence of the first model is explained (weighted loss) and fixed; the app now shows calibrated probabilities (Section~\ref{sec:calibration_bench}).
+  \item Grad-CAM is no longer only illustrated but measured against expert bounding boxes (Section~\ref{sec:localisation}), and per-subgroup performance is reported.
+  \item The app serves the four models and their ensemble, with a side-by-side comparison view.
+  \item \emph{``What is the role of Docker?''} Answered in Section~\ref{sec:docker}: it delivers the trained models as a reproducible, two-container service, which we ran end to end.
+\end{itemize}
+\end{minipage}}
+\end{center}
 
 \section{Introduction}
 Chest radiography is one of the most common imaging exams, and reading it is slow and subject to variability between readers. Automatic multi-label classification of findings is a standard benchmark for medical image analysis with deep learning. The task is difficult for three reasons: findings are visually subtle, several can co-occur in one image, and the labels are noisy.
 
-Our goals were to (i) build a sound, reproducible training and evaluation pipeline, (ii) report honest numbers on the official test split, (iii) make the predictions inspectable with Grad-CAM, and (iv) deliver the model as a working application rather than a notebook. The full code, tests and instructions are in the project repository (\url{https://github.com/khldd/chest-xray-diagnosis}).
+Our goals were to (i) build a sound, reproducible training and evaluation pipeline, (ii) report honest numbers on the official test split, (iii) make the predictions inspectable with Grad-CAM, and (iv) deliver the model as a working application rather than a notebook. After the first review we added (v) a comparison of four architectures under one protocol, with statistical tests, calibration, and a measurement of the explanations against expert annotations. The full code, tests and instructions are in the project repository (\url{https://github.com/khldd/chest-xray-diagnosis}).
 
 \section{Dataset}
 We use the NIH ChestX-ray14 dataset~\cite{wang2017chestxray}: 112{,}120 frontal X-rays from 30{,}805 patients, each labelled with any of 14 findings (or ``No Finding''). The labels were extracted automatically from radiology reports, so they contain noise that no model can overcome. The images (about 45 GB) are not stored in the repository.
@@ -98,7 +119,7 @@ AUC does not say how the model behaves as a yes/no detector. We therefore choose
 \label{fig:calibration}
 \end{figure}
 
-The scores are strongly over-confident (Figure~\ref{fig:calibration}): the sigmoid outputs should be read as rankings, not as probabilities, and the interface values should not be quoted as certainty. The weighted loss is the likely cause (Section~\ref{sec:ablations}).
+The scores of this first model are strongly over-confident (Figure~\ref{fig:calibration}): its sigmoid outputs should be read as rankings, not as probabilities. Section~\ref{sec:calibration_bench} confirms that the weighted loss is the cause, on four architectures, and shows how the models now served are calibrated.
 
 \subsection{Ablations}
 \label{sec:ablations}
@@ -115,10 +136,12 @@ Figure~\ref{fig:gradcam} shows heatmaps for two correctly detected test images. 
 \label{fig:gradcam}
 \end{figure}
 
-These examples are \emph{confident} cases chosen for demonstration (probabilities close to 1), not typical ones. Grad-CAM is a qualitative tool: we did not measure localisation accuracy against annotated regions, so the heatmaps should be read as plausibility checks and not as evidence of correct reasoning.
+These examples are \emph{confident} cases chosen for demonstration (probabilities close to 1), not typical ones. Section~\ref{sec:localisation} measures how often the heatmaps actually point at the lesion, on 984 boxes drawn by radiologists: for DenseNet121 (trained with the benchmark recipe; this exact checkpoint was not scored) the answer is only modestly better than always pointing at the image centre, so single examples like these should not be read as evidence of correct reasoning.
+
+\input{sections/benchmark.tex}
 
 \section{System}
-The model is delivered as a small web application (Figure~\ref{fig:arch}).
+The models are delivered as a small web application (Figure~\ref{fig:arch}).
 
 \begin{figure}[ht]
 \centering
@@ -133,35 +156,58 @@ Browser (React) & $\rightarrow$ & nginx & $\rightarrow$ & FastAPI (ONNX Runtime;
 \paragraph{Backend.} The trained PyTorch model is exported to ONNX. An automatic check confirms the exported model matches PyTorch (largest output difference about $1.4\times10^{-6}$), and the API's probabilities match PyTorch to about $1.5\times10^{-7}$. Preprocessing in the API is implemented in NumPy and tested to be identical to the training-time transforms. The endpoints are:
 \begin{itemize}
   \item \texttt{GET /health} and \texttt{GET /model/metadata} (classes, input size, validation and test AUC, model hash);
-  \item \texttt{POST /predict}: all 14 probabilities, the top five, and latency;
-  \item \texttt{POST /predict/visualize}: the same plus a Grad-CAM overlay. Grad-CAM needs gradients, which ONNX Runtime does not provide, so this endpoint loads the PyTorch checkpoint lazily.
+  \item \texttt{GET /models}: the served models with their test AUC, temperature and size, plus the ensemble;
+  \item \texttt{POST /predict?model=\dots}: all 14 probabilities, the top five, and latency, for one model or the ensemble;
+  \item \texttt{POST /predict/visualize}: the same plus a Grad-CAM overlay. Grad-CAM needs gradients, which ONNX Runtime does not provide, so this endpoint loads the PyTorch checkpoint lazily;
+  \item \texttt{POST /predict/compare}: every model and the ensemble on the same image, each with its heatmap for a chosen disease.
 \end{itemize}
+The served models are listed in \texttt{models/registry.json}, generated from the benchmark results: architecture, file paths, validation and test AUC, and the temperature fitted on validation. Probabilities are computed as $\sigma(z/T)$ with that temperature, and the ensemble averages the members' probabilities (and heatmaps). All four architectures pass the same ONNX parity check against PyTorch (largest relative output difference $1.7\times10^{-5}$).
 Uploads are decoded for real, not trusted by file type: non-images are rejected with a 400 and files over 10~MB with a 413. Cross-origin access is limited to configured origins.
 
-\paragraph{Frontend.} A React and TypeScript single-page app supports drag-and-drop upload, an example gallery of eight test-set X-rays, webcam capture (implemented, but not yet tested with a physical camera), probability bars, a Grad-CAM overlay selectable per disease, and a display of model metadata and latency. Stale responses are discarded so a slow heatmap cannot overwrite a newer upload.
+\paragraph{Frontend.} A React and TypeScript single-page app supports drag-and-drop upload, an example gallery of eight test-set X-rays, webcam capture (implemented, but not yet tested with a physical camera), probability bars, a Grad-CAM overlay selectable per disease, and a display of model metadata and latency. Stale responses are discarded so a slow heatmap cannot overwrite a newer upload. A model selector switches between the four models and the ensemble, and a comparison view runs all of them on the same image (Figure~\ref{fig:app_compare}). Agreement between architectures is more convincing than one model alone; disagreement, such as a heatmap that points elsewhere, is a reason for caution.
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.85\textwidth]{app_compare.jpg}
+\caption{Comparison view of the application, running in Docker, on a test-set X-ray labelled Cardiomegaly. All models give a high calibrated probability; three heatmaps cover the heart, while EfficientNet-B0's points at the edge of the left lung, consistent with its low Cardiomegaly localisation score (Figure~\ref{fig:localisation_disease}).}
+\label{fig:app_compare}
+\end{figure}
 
 \paragraph{Performance.} On a laptop CPU, \texttt{/predict} takes about 25~ms per image. A Grad-CAM heatmap takes about 0.3~s once warm, but the first one after the server starts takes 7 to 13~s because PyTorch and the model are loaded; the interface shows a loading state for this.
 
 \paragraph{Engineering.} Model weights are versioned with DVC and stored on a DagsHub remote; git holds only a small pointer file. Training is configured by YAML files and tracked with MLflow. Automated tests (data splitting, model shapes, ONNX parity, the API with a stub model, and an end-to-end training smoke test on synthetic data) run in GitHub Actions together with linting, the frontend build and the Docker image build. The application is started with \texttt{docker compose up}; weights are mounted into the container and never baked into an image.
+
+\input{sections/docker.tex}
 
 \section{Limitations and ethics}
 \begin{itemize}
   \item \textbf{Not a medical device.} The system is a research and educational demo. It must not be used for diagnosis, and the interface says so.
   \item \textbf{Label noise.} Labels are machine-extracted from reports, so reported AUCs measure agreement with noisy labels, not with a radiologist's ground truth.
   \item \textbf{Single dataset, single hospital.} We did no external validation, so performance on other populations and scanners is unknown.
-  \item \textbf{Single run, no confidence intervals.} Results come from one training run and one seed per setting; differences of a few thousandths of AUC are not meaningful, and the 0.013 advantage of plain over weighted loss in the ablation is suggestive only.
-  \item \textbf{Low resolution.} Images are reduced to $224\times224$, which can hide small findings such as nodules.
-  \item \textbf{Over-confident, uncalibrated scores and low precision.} The outputs rank cases well but are not probabilities (mean score 0.38 against 7.6\% prevalence), and at a useful sensitivity the precision is low (mean 0.14). No recalibration was applied.
+  \item \textbf{Training randomness measured for one architecture only.} Confidence intervals cover the finite test set; seed-to-seed variation was measured for DenseNet121 only (standard deviation 0.002 of test AUC). ConvNeXt-Tiny's 0.006 lead over DenseNet121 is therefore likely but not established.
+  \item \textbf{Short training.} Benchmark runs use 5 epochs, the budget of the original ablations; longer schedules could change the ranking, particularly for the larger networks.
+  \item \textbf{Low resolution.} Images are reduced to $224\times224$, which can hide small findings: no model localises nodules (Section~\ref{sec:localisation}).
+  \item \textbf{Calibration is global, precision is low.} One temperature per model makes the scores calibrated when pooled over all classes, but individual rare classes can still be off. At a useful sensitivity the precision remains low (mean 0.14 for the first model), because most findings are rare.
+  \item \textbf{Localisation is noisy and partial.} Grad-CAM scores vary between seeds (DenseNet121: 25--33\%), only eight findings have boxes, and two frozen runs were not scored.
   \item \textbf{Horizontal flip.} Flipping moves the heart to the wrong side of the image, which may matter for findings such as Cardiomegaly.
 \end{itemize}
 
 \section{Conclusion}
-We built an end-to-end system: a leakage-free training pipeline, a DenseNet121 classifier with a mean test AUC of 0.799, visual explanations, and a tested, containerised application. Ablations show that fine-tuning is essential and that plain cross-entropy matched or beat our weighted loss, so retraining the main model without class weights and recalibrating its scores is the most direct improvement. Other natural next steps are higher input resolution, a stronger backbone, label-noise-aware training, calibration, quantitative evaluation of the heatmaps, and external validation.
+We built an end-to-end system: a leakage-free training pipeline, visual explanations, and a tested, containerised application. Repeating the ablation study on four architectures turned single-run observations into findings:
+\begin{itemize}
+  \item fine-tuning is essential for every network;
+  \item class weighting does not improve AUC and is what made the first model over-confident;
+  \item plain cross-entropy with temperature scaling gives calibrated probabilities.
+\end{itemize}
+ConvNeXt-Tiny is the strongest single model (test AUC 0.809) and also the one whose heatmaps most often point at the lesion; averaging four architectures reaches 0.816. Measuring the explanations showed that a good AUC does not guarantee good heatmaps, which is why the application lets the user compare models side by side. Natural next steps are seeds for every architecture, higher input resolution, longer training, label-noise-aware training and external validation on another hospital's data.
 
 \begin{thebibliography}{9}
 \bibitem{wang2017chestxray} X.~Wang, Y.~Peng, L.~Lu, Z.~Lu, M.~Bagheri, R.~Summers. ChestX-ray8: Hospital-scale chest X-ray database and benchmarks on weakly-supervised classification and localization of common thorax diseases. \emph{CVPR}, 2017.
 \bibitem{huang2017densenet} G.~Huang, Z.~Liu, L.~van~der~Maaten, K.~Weinberger. Densely connected convolutional networks. \emph{CVPR}, 2017.
 \bibitem{selvaraju2017gradcam} R.~Selvaraju, M.~Cogswell, A.~Das, R.~Vedantam, D.~Parikh, D.~Batra. Grad-CAM: Visual explanations from deep networks via gradient-based localization. \emph{ICCV}, 2017.
+\bibitem{he2016resnet} K.~He, X.~Zhang, S.~Ren, J.~Sun. Deep residual learning for image recognition. \emph{CVPR}, 2016.
+\bibitem{tan2019efficientnet} M.~Tan, Q.~Le. EfficientNet: Rethinking model scaling for convolutional neural networks. \emph{ICML}, 2019.
+\bibitem{liu2022convnext} Z.~Liu, H.~Mao, C.-Y.~Wu, C.~Feichtenhofer, T.~Darrell, S.~Xie. A ConvNet for the 2020s. \emph{CVPR}, 2022.
 \end{thebibliography}
 
 \end{document}
